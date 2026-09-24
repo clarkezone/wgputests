@@ -26,6 +26,7 @@ fn particle_vs(input: ParticleInput) -> ParticleOutput {
         * vec4<f32>(input.position_size.xyz, 1.0);
     let pixel_offset = input.corner
         * input.position_size.w
+        * scene.viewport_brightness.w
         * 2.0
         / scene.viewport_brightness.xy;
     clip.x += pixel_offset.x * clip.w;

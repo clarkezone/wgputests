@@ -311,6 +311,8 @@ impl OrbitalSphereScene {
         let half_fov_tangent = (45.0_f32.to_radians() * 0.5).tan();
         let content_radius = 3.0 * scale;
         let camera_z = content_radius / (half_fov_tangent * aspect.clamp(0.01, 1.0)) + 0.5;
+        let projected_scale = viewport.height * scale / (2.0 * camera_z * half_fov_tangent);
+        let particle_scale = (projected_scale / 105.0).clamp(0.25, 1.25);
         let view = glam::camera::rh::view::look_at_mat4(
             Vec3::new(0.0, 0.0, camera_z),
             Vec3::ZERO,
@@ -327,7 +329,7 @@ impl OrbitalSphereScene {
             bytemuck::bytes_of(&SceneUniforms {
                 view_projection: (projection * view).to_cols_array_2d(),
                 group_model: group_model.to_cols_array_2d(),
-                viewport_brightness: [viewport.width, viewport.height, 1.45, elapsed],
+                viewport_brightness: [viewport.width, viewport.height, 1.45, particle_scale],
             }),
         );
 
