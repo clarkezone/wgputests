@@ -1,6 +1,7 @@
 mod cube;
 mod logic_core;
 mod orbital_sphere;
+mod prismatic;
 mod ui;
 
 use std::sync::Arc;
@@ -10,6 +11,7 @@ use cube::CubeScene;
 use egui_wgpu::{Renderer as EguiRenderer, RendererOptions, ScreenDescriptor};
 use logic_core::LogicCoreScene;
 use orbital_sphere::OrbitalSphereScene;
+use prismatic::PrismaticScene;
 use ui::{Experience, UiLayout};
 use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
@@ -57,6 +59,7 @@ struct Renderer {
     cube: CubeScene,
     logic_core: LogicCoreScene,
     orbital_sphere: OrbitalSphereScene,
+    prismatic: PrismaticScene,
     egui_context: egui::Context,
     egui_state: egui_winit::State,
     egui_renderer: EguiRenderer,
@@ -117,6 +120,7 @@ impl Renderer {
         let cube = CubeScene::new(&device, config.format, DEPTH_FORMAT);
         let logic_core = LogicCoreScene::new(&device, config.format, DEPTH_FORMAT);
         let orbital_sphere = OrbitalSphereScene::new(&device, config.format, DEPTH_FORMAT);
+        let prismatic = PrismaticScene::new(&device, config.format);
         let depth_texture = DepthTexture::new(&device, &config);
 
         let egui_context = egui::Context::default();
@@ -145,6 +149,7 @@ impl Renderer {
             cube,
             logic_core,
             orbital_sphere,
+            prismatic,
             egui_context,
             egui_state,
             egui_renderer,
@@ -186,11 +191,19 @@ impl Renderer {
                     self.experience = Experience::OrbitalSphere;
                     return true;
                 }
+                PhysicalKey::Code(KeyCode::Digit4) => {
+                    self.experience = Experience::Prismatic;
+                    return true;
+                }
                 _ => {}
             }
         }
 
-        self.experience == Experience::Cube && self.cube.handle_input(event)
+        match self.experience {
+            Experience::Cube => self.cube.handle_input(event),
+            Experience::Prismatic => self.prismatic.handle_input(event),
+            _ => false,
+        }
     }
 
     fn render(&mut self) -> RenderOutcome {
@@ -259,6 +272,18 @@ impl Renderer {
                     .update(&self.queue, elapsed, viewport, &self.config);
                 self.orbital_sphere
                     .render(&mut encoder, &view, &self.depth_texture.view, viewport);
+            }
+            Experience::Prismatic => {
+                let viewport = rect_to_pixels(
+                    layout
+                        .logic_viewport
+                        .expect("prismatic scene has a viewport"),
+                    pixels_per_point,
+                    &self.config,
+                );
+                self.prismatic
+                    .update(&self.device, &self.queue, elapsed, viewport);
+                self.prismatic.render(&mut encoder, &view, viewport);
             }
         }
 

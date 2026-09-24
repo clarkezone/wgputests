@@ -21,12 +21,19 @@ Experiences:
   central core, orbiting data nodes, pulse, and environmental drift.
 - **Orbital Sphere** ports ThreeUI's particle sphere, six additive orbit
   rings, and glowing orbital nodes, with a deliberately brighter treatment.
+- **Prismatic** is an original optical scene: a glass prism splits white light
+  into 24 wavelength-dependent beams using Snell refraction and Cauchy
+  dispersion, with illustrative airborne scattering, spectral light on the
+  floor, and a native HDR bloom pass. It is an artistic optics visualization,
+  not a calibrated physical simulation.
 
 Controls:
 
 - Drag with the left mouse button to rotate the cube.
 - Use WASD or the arrow keys to rotate it.
-- Use the selector or press `1`, `2`, and `3` to switch experiences.
+- Use the selector or press `1`, `2`, `3`, and `4` to switch experiences.
+- In Prismatic, use Left/Right to adjust the incident beam angle, Space to
+  pause/resume motion, and R to reset the angle and animation.
 - Press Escape to exit.
 
 The Logic Core and Orbital Sphere designs are adapted from ThreeUI's

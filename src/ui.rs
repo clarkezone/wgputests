@@ -6,6 +6,7 @@ pub enum Experience {
     Cube,
     LogicCore,
     OrbitalSphere,
+    Prismatic,
 }
 
 #[derive(Default)]
@@ -23,29 +24,35 @@ pub fn draw(root_ui: &mut egui::Ui, experience: &mut Experience, _elapsed: f32) 
         )
         .show(root_ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new("WEBGPU EXPERIENCES")
-                        .size(12.0)
-                        .strong()
-                        .color(Color32::from_gray(175)),
-                );
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    selector_button(
-                        ui,
-                        experience,
-                        Experience::OrbitalSphere,
-                        "Orbital Sphere",
-                        "3",
+                if ui.available_width() >= 600.0 {
+                    ui.label(
+                        RichText::new("WEBGPU EXPERIENCES")
+                            .size(12.0)
+                            .strong()
+                            .color(Color32::from_gray(175)),
                     );
-                    selector_button(ui, experience, Experience::LogicCore, "Logic Core", "2");
-                    selector_button(ui, experience, Experience::Cube, "Cube", "1");
-                });
+                }
+                ui.with_layout(
+                    Layout::right_to_left(Align::Center).with_main_wrap(true),
+                    |ui| {
+                        selector_button(ui, experience, Experience::Prismatic, "Prismatic", "4");
+                        selector_button(
+                            ui,
+                            experience,
+                            Experience::OrbitalSphere,
+                            "Orbital Sphere",
+                            "3",
+                        );
+                        selector_button(ui, experience, Experience::LogicCore, "Logic Core", "2");
+                        selector_button(ui, experience, Experience::Cube, "Cube", "1");
+                    },
+                );
             });
         });
 
     if matches!(
         *experience,
-        Experience::LogicCore | Experience::OrbitalSphere
+        Experience::LogicCore | Experience::OrbitalSphere | Experience::Prismatic
     ) {
         let mut viewport = Rect::NOTHING;
         egui::CentralPanel::default()
