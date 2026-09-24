@@ -1,8 +1,9 @@
 # Native 3D App
 
-A small native Rust/WebGPU starter for Windows, macOS, and Omarchy Linux. It uses
-`winit` for native windows and input, `wgpu` for GPU rendering, and WGSL shaders.
-There is no browser runtime or Electron dependency.
+A native Rust/WebGPU experience gallery for Windows, macOS, and Omarchy Linux.
+It uses `winit` for native windows and input, `wgpu` for GPU rendering, WGSL
+shaders, and `egui` for the native selector and interface. There is no browser
+runtime or Electron dependency.
 
 ## Run
 
@@ -12,11 +13,24 @@ Install the current stable Rust toolchain, then:
 cargo run
 ```
 
+Experiences:
+
+- **Cube** preserves the original animated 3D starter.
+- **Logic Core** is a native Rust/WGSL port of ThreeUI's open-source Three.js
+  Logic Core scene, including its isometric platform, emissive central core,
+  orbiting data nodes, dark card layout, collaboration graphic, and terminal
+  treatment.
+
 Controls:
 
 - Drag with the left mouse button to rotate the cube.
 - Use WASD or the arrow keys to rotate it.
+- Use the selector or press `1` and `2` to switch experiences.
 - Press Escape to exit.
+
+The Logic Core design is adapted from
+[ThreeUI](https://threeui.com/three-js/structure-flow/logic-core), licensed
+under the MIT License, Copyright (c) 2026 Meng To.
 
 ## Graphics backends
 
