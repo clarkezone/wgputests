@@ -44,9 +44,13 @@ fn particle_fs(input: ParticleOutput) -> @location(0) vec4<f32> {
     if distance > 1.0 {
         discard;
     }
-    let hard_circle = 1.0 - smoothstep(0.72, 1.0, distance);
-    let soft_halo = pow(max(1.0 - distance, 0.0), 2.2);
-    let alpha = mix(soft_halo, hard_circle, input.color_softness.a);
+    let hard_circle = 1.0 - smoothstep(0.48, 0.82, distance);
+    let soft_halo = pow(max(1.0 - distance, 0.0), 1.55);
+    let alpha = min(
+        hard_circle * input.color_softness.a
+            + soft_halo * (1.0 - input.color_softness.a) * 1.45,
+        1.0,
+    );
     let color = input.color_softness.rgb * scene.viewport_brightness.z * alpha;
     return vec4<f32>(color, alpha);
 }

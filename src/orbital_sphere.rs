@@ -86,6 +86,7 @@ pub struct OrbitalSphereScene {
     line_pipeline: wgpu::RenderPipeline,
     quad_buffer: wgpu::Buffer,
     quad_index_buffer: wgpu::Buffer,
+    bloom_buffer: wgpu::Buffer,
     particle_buffer: wgpu::Buffer,
     particle_count: u32,
     node_buffer: wgpu::Buffer,
@@ -240,7 +241,12 @@ impl OrbitalSphereScene {
             contents: bytemuck::cast_slice(&[0_u16, 1, 2, 2, 3, 0]),
             usage: wgpu::BufferUsages::INDEX,
         });
-        let particles = create_sphere_particles();
+        let (particles, bloom_particles) = create_sphere_particles();
+        let bloom_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("orbital sphere particle bloom"),
+            contents: bytemuck::cast_slice(&bloom_particles),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
         let particle_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("orbital sphere particles"),
             contents: bytemuck::cast_slice(&particles),
@@ -270,6 +276,7 @@ impl OrbitalSphereScene {
             line_pipeline,
             quad_buffer,
             quad_index_buffer,
+            bloom_buffer,
             particle_buffer,
             particle_count: particles.len() as u32,
             node_buffer,
@@ -300,14 +307,10 @@ impl OrbitalSphereScene {
             0.1,
             1000.0,
         );
-        let desktop = viewport.width >= 1024.0;
-        let camera_z = if desktop { 5.5 } else { 6.5 };
-        let position = if desktop {
-            Vec3::new(2.5, 0.0, -2.0)
-        } else {
-            Vec3::new(0.0, -1.0, -3.0)
-        };
-        let scale = if desktop { 1.15 } else { 1.0 };
+        let scale = 1.1;
+        let half_fov_tangent = (45.0_f32.to_radians() * 0.5).tan();
+        let content_radius = 3.0 * scale;
+        let camera_z = content_radius / (half_fov_tangent * aspect.clamp(0.01, 1.0)) + 0.5;
         let view = glam::camera::rh::view::look_at_mat4(
             Vec3::new(0.0, 0.0, camera_z),
             Vec3::ZERO,
@@ -316,7 +319,7 @@ impl OrbitalSphereScene {
         let group_model = Mat4::from_scale_rotation_translation(
             Vec3::splat(scale),
             Quat::from_euler(glam::EulerRot::XYZ, elapsed * 0.018, elapsed * 0.048, 0.0),
-            position,
+            Vec3::ZERO,
         );
         queue.write_buffer(
             &self.uniform_buffer,
@@ -424,6 +427,8 @@ impl OrbitalSphereScene {
         pass.set_pipeline(&self.particle_pipeline);
         pass.set_vertex_buffer(0, self.quad_buffer.slice(..));
         pass.set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        pass.set_vertex_buffer(1, self.bloom_buffer.slice(..));
+        pass.draw_indexed(0..6, 0, 0..self.particle_count);
         pass.set_vertex_buffer(1, self.particle_buffer.slice(..));
         pass.draw_indexed(0..6, 0, 0..self.particle_count);
         pass.set_vertex_buffer(1, self.node_buffer.slice(..));
@@ -431,10 +436,11 @@ impl OrbitalSphereScene {
     }
 }
 
-fn create_sphere_particles() -> Vec<Particle> {
+fn create_sphere_particles() -> (Vec<Particle>, Vec<Particle>) {
     let bright = srgb_to_linear(Vec3::new(0xa7 as f32, 0x8b as f32, 0xfa as f32) / 255.0);
     let dim = srgb_to_linear(Vec3::new(0x70 as f32, 0x1a as f32, 0x75 as f32) / 255.0);
     let mut particles = Vec::with_capacity(SOURCE_PARTICLE_COUNT);
+    let mut bloom_particles = Vec::with_capacity(SOURCE_PARTICLE_COUNT);
     for index in 0..SOURCE_PARTICLE_COUNT {
         let phi = (-1.0 + (2.0 * index as f32) / SOURCE_PARTICLE_COUNT as f32).acos();
         let theta = (SOURCE_PARTICLE_COUNT as f32 * std::f32::consts::PI).sqrt() * phi;
@@ -447,12 +453,17 @@ fn create_sphere_particles() -> Vec<Particle> {
         }
         let distortion = 1.0 + noise * 0.1;
         let color = dim.lerp(bright, if noise > 0.5 { 1.0 } else { 0.3 });
+        let position = [x * distortion, y * distortion, z * distortion];
         particles.push(Particle {
-            position_size: [x * distortion, y * distortion, z * distortion, 3.2],
-            color_softness: [color.x, color.y, color.z, 0.72],
+            position_size: [position[0], position[1], position[2], 2.5],
+            color_softness: [color.x, color.y, color.z, 0.95],
+        });
+        bloom_particles.push(Particle {
+            position_size: [position[0], position[1], position[2], 5.5],
+            color_softness: [color.x * 0.16, color.y * 0.16, color.z * 0.16, 0.0],
         });
     }
-    particles
+    (particles, bloom_particles)
 }
 
 fn orbit_point(radius: f32, fraction: f32) -> Vec3 {
