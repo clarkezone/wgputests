@@ -17,9 +17,8 @@ Experiences:
 
 - **Cube** preserves the original animated 3D starter.
 - **Logic Core** is a native Rust/WGSL port of ThreeUI's open-source Three.js
-  Logic Core scene, including its isometric platform, emissive central core,
-  orbiting data nodes, dark card layout, collaboration graphic, and terminal
-  treatment.
+  Logic Core scene, including its full-screen isometric platform, emissive
+  central core, orbiting data nodes, pulse, and environmental drift.
 
 Controls:
 
