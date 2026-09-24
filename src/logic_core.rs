@@ -28,20 +28,18 @@ struct Instance {
     model_2: [f32; 4],
     model_3: [f32; 4],
     color_emissive: [f32; 4],
-    material: [f32; 4],
 }
 
 impl Instance {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
+    const ATTRIBUTES: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
         1 => Float32x4,
         2 => Float32x4,
         3 => Float32x4,
         4 => Float32x4,
-        5 => Float32x4,
-        7 => Float32x4
+        5 => Float32x4
     ];
 
-    fn new(model: Mat4, color: Vec3, emissive: f32, roughness: f32, metalness: f32) -> Self {
+    fn new(model: Mat4, color: Vec3, emissive: f32) -> Self {
         let columns = model.to_cols_array_2d();
         Self {
             model_0: columns[0],
@@ -49,7 +47,6 @@ impl Instance {
             model_2: columns[2],
             model_3: columns[3],
             color_emissive: [color.x, color.y, color.z, emissive],
-            material: [roughness, metalness, 0.0, 0.0],
         }
     }
 
@@ -327,7 +324,7 @@ impl LogicCoreScene {
             0,
             bytemuck::bytes_of(&SceneUniforms {
                 view_projection: (projection * view).to_cols_array_2d(),
-                light_direction: Vec4::new(10.0, 20.0, 5.0, 1.0 + pulse * 1.5).to_array(),
+                light_direction: Vec4::new(0.42, 0.84, 0.34, 0.0).to_array(),
                 camera_position: Vec4::new(20.0, 20.0, 20.0, 1.0).to_array(),
             }),
         );
@@ -344,8 +341,6 @@ impl LogicCoreScene {
                 ),
             Vec3::splat(0.006),
             0.0,
-            0.9,
-            0.1,
         ));
         instances.push(Instance::new(
             drift
@@ -355,9 +350,7 @@ impl LogicCoreScene {
                     Vec3::new(0.0, 0.25, 0.0),
                 ),
             Vec3::new(0.0, 0.898, 1.0),
-            0.4 + pulse * 0.6,
-            0.2,
-            0.0,
+            0.55 + pulse * 0.75,
         ));
 
         for index in 0..12 {
@@ -376,7 +369,7 @@ impl LogicCoreScene {
             let size = 0.4 + hash(seed * 3.47) * 0.4;
             let rotation =
                 glam::Quat::from_euler(glam::EulerRot::XYZ, elapsed * 0.6, elapsed * 1.2, 0.0);
-            let accent = hash(seed * 11.17) > 0.68;
+            let accent = index == 2 || index == 8;
             let color = if accent {
                 Vec3::new(0.0, 0.898, 1.0)
             } else {
@@ -387,8 +380,6 @@ impl LogicCoreScene {
                     * Mat4::from_scale_rotation_translation(Vec3::splat(size), rotation, position),
                 color,
                 if accent { 0.45 + pulse * 0.35 } else { 0.0 },
-                if accent { 0.2 } else { 0.8 },
-                0.0,
             ));
         }
         queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&instances));
