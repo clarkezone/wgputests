@@ -7,10 +7,17 @@ edition = "2024"
 bytemuck = { version = "1.25.2", features = ["derive"] }
 egui = "0.36.2"
 egui-wgpu = "0.36.2"
-egui-winit = "0.36.2"
 env_logger = "0.11"
 glam = "0.33.9"
 log = "0.4"
 pollster = "1.0.1"
 wgpu = "30.0.1"
 winit = "0.30"
+
+# arboard's eager X11 connection can block startup in a Wayland session with DISPLAY set.
+# Keep Wayland clipboard support through smithay-clipboard on Linux.
+[target.'cfg(target_os = "linux")'.dependencies]
+egui-winit = { version = "0.36.2", default-features = false, features = ["links", "wayland", "x11", "smithay-clipboard"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+egui-winit = "0.36.2"
