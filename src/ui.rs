@@ -5,6 +5,7 @@ pub enum Experience {
     #[default]
     Cube,
     LogicCore,
+    OrbitalSphere,
 }
 
 #[derive(Default)]
@@ -29,13 +30,23 @@ pub fn draw(root_ui: &mut egui::Ui, experience: &mut Experience, _elapsed: f32) 
                         .color(Color32::from_gray(175)),
                 );
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    selector_button(
+                        ui,
+                        experience,
+                        Experience::OrbitalSphere,
+                        "Orbital Sphere",
+                        "3",
+                    );
                     selector_button(ui, experience, Experience::LogicCore, "Logic Core", "2");
                     selector_button(ui, experience, Experience::Cube, "Cube", "1");
                 });
             });
         });
 
-    if *experience == Experience::LogicCore {
+    if matches!(
+        *experience,
+        Experience::LogicCore | Experience::OrbitalSphere
+    ) {
         let mut viewport = Rect::NOTHING;
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(Color32::TRANSPARENT))

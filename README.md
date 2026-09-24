@@ -19,17 +19,20 @@ Experiences:
 - **Logic Core** is a native Rust/WGSL port of ThreeUI's open-source Three.js
   Logic Core scene, including its full-screen isometric platform, emissive
   central core, orbiting data nodes, pulse, and environmental drift.
+- **Orbital Sphere** ports ThreeUI's particle sphere, six additive orbit
+  rings, and glowing orbital nodes, with a deliberately brighter treatment.
 
 Controls:
 
 - Drag with the left mouse button to rotate the cube.
 - Use WASD or the arrow keys to rotate it.
-- Use the selector or press `1` and `2` to switch experiences.
+- Use the selector or press `1`, `2`, and `3` to switch experiences.
 - Press Escape to exit.
 
-The Logic Core design is adapted from
-[ThreeUI](https://threeui.com/three-js/structure-flow/logic-core), licensed
-under the MIT License, Copyright (c) 2026 Meng To.
+The Logic Core and Orbital Sphere designs are adapted from ThreeUI's
+[Logic Core](https://threeui.com/three-js/structure-flow/logic-core) and
+[Orbital Sphere](https://threeui.com/three-js/structure-flow/orbital-sphere)
+components, licensed under the MIT License, Copyright (c) 2026 Meng To.
 
 ## Graphics backends
 

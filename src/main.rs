@@ -1,5 +1,6 @@
 mod cube;
 mod logic_core;
+mod orbital_sphere;
 mod ui;
 
 use std::sync::Arc;
@@ -8,6 +9,7 @@ use std::time::Instant;
 use cube::CubeScene;
 use egui_wgpu::{Renderer as EguiRenderer, RendererOptions, ScreenDescriptor};
 use logic_core::LogicCoreScene;
+use orbital_sphere::OrbitalSphereScene;
 use ui::{Experience, UiLayout};
 use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
@@ -54,6 +56,7 @@ struct Renderer {
     depth_texture: DepthTexture,
     cube: CubeScene,
     logic_core: LogicCoreScene,
+    orbital_sphere: OrbitalSphereScene,
     egui_context: egui::Context,
     egui_state: egui_winit::State,
     egui_renderer: EguiRenderer,
@@ -113,6 +116,7 @@ impl Renderer {
 
         let cube = CubeScene::new(&device, config.format, DEPTH_FORMAT);
         let logic_core = LogicCoreScene::new(&device, config.format, DEPTH_FORMAT);
+        let orbital_sphere = OrbitalSphereScene::new(&device, config.format, DEPTH_FORMAT);
         let depth_texture = DepthTexture::new(&device, &config);
 
         let egui_context = egui::Context::default();
@@ -140,6 +144,7 @@ impl Renderer {
             depth_texture,
             cube,
             logic_core,
+            orbital_sphere,
             egui_context,
             egui_state,
             egui_renderer,
@@ -175,6 +180,10 @@ impl Renderer {
                 }
                 PhysicalKey::Code(KeyCode::Digit2) => {
                     self.experience = Experience::LogicCore;
+                    return true;
+                }
+                PhysicalKey::Code(KeyCode::Digit3) => {
+                    self.experience = Experience::OrbitalSphere;
                     return true;
                 }
                 _ => {}
@@ -240,6 +249,15 @@ impl Renderer {
                 self.logic_core
                     .update(&self.queue, elapsed, viewport, &self.config);
                 self.logic_core
+                    .render(&mut encoder, &view, &self.depth_texture.view, viewport);
+            }
+            Experience::OrbitalSphere => {
+                let viewport = layout
+                    .logic_viewport
+                    .map(|rect| rect_to_pixels(rect, pixels_per_point, &self.config));
+                self.orbital_sphere
+                    .update(&self.queue, elapsed, viewport, &self.config);
+                self.orbital_sphere
                     .render(&mut encoder, &view, &self.depth_texture.view, viewport);
             }
         }

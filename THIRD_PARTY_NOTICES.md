@@ -1,11 +1,13 @@
 # Third-Party Notices
 
-## ThreeUI Logic Core
+## ThreeUI Structure Flow Experiences
 
-The native Logic Core experience is adapted from the ThreeUI Logic Core
-component:
+The native Logic Core and Orbital Sphere experiences are adapted from these
+ThreeUI components:
 
 https://threeui.com/three-js/structure-flow/logic-core
+
+https://threeui.com/three-js/structure-flow/orbital-sphere
 
 MIT License
 
