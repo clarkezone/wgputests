@@ -13,6 +13,40 @@ Install the current stable Rust toolchain, then:
 cargo run
 ```
 
+With no arguments, the regular interactive gallery opens with its selector and
+keyboard controls. Screensaver mode is also available on Windows, macOS, and
+Linux:
+
+```text
+cargo run --release -- --screensaver
+```
+
+It opens borderless and full screen, hides the selector and cursor, rotates the
+four scenes every three minutes, and closes on keyboard, mouse, touch, or focus
+loss. Use `--scene=cube`, `--scene=logic-core`, `--scene=orbital-sphere`, or
+`--scene=prismatic` to start with a particular scene. `--rotate-seconds=N`
+changes the interval; `--no-rotate` holds one scene. `--help` lists the flags.
+
+### Omarchy idle rotation
+
+On Omarchy, this repository can rotate the existing `ttfx` text screensaver
+and the four Rust scenes during one idle session. Build and install it with:
+
+```text
+cargo build --release
+bash integrations/omarchy/install.sh
+```
+
+The installer copies the binary to `~/.local/bin/wgputests-screensaver` and
+clones Omarchy's idle service into your user configuration. It changes the
+service root to Quickshell `Scope` so its idle monitor runs as a headless user
+plugin, then changes the screensaver launch command. Omarchy continues to own
+the idle and lock timers.
+Each mode runs for three minutes by default. Set `WGPU_SCREENSAVER_SECONDS` in
+the shell environment to change that interval. Rebuild and rerun the installer
+after code changes. The Omarchy integration requires `ttfx`, `jq`, and one of
+the terminals supported by Omarchy's existing text saver.
+
 Experiences:
 
 - **Cube** preserves the original animated 3D starter.

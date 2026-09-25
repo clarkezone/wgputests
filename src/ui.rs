@@ -9,12 +9,38 @@ pub enum Experience {
     Prismatic,
 }
 
+impl Experience {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Cube => Self::LogicCore,
+            Self::LogicCore => Self::OrbitalSphere,
+            Self::OrbitalSphere => Self::Prismatic,
+            Self::Prismatic => Self::Cube,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct UiLayout {
     pub logic_viewport: Option<Rect>,
 }
 
-pub fn draw(root_ui: &mut egui::Ui, experience: &mut Experience, _elapsed: f32) -> UiLayout {
+pub fn draw(
+    root_ui: &mut egui::Ui,
+    experience: &mut Experience,
+    _elapsed: f32,
+    screensaver: bool,
+) -> UiLayout {
+    if screensaver {
+        let mut viewport = Rect::NOTHING;
+        egui::CentralPanel::default()
+            .frame(egui::Frame::new().fill(Color32::TRANSPARENT))
+            .show(root_ui, |ui| viewport = ui.available_rect_before_wrap());
+        return UiLayout {
+            logic_viewport: Some(viewport),
+        };
+    }
+
     egui::Panel::top("experience_selector")
         .frame(
             egui::Frame::new()
