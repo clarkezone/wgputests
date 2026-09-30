@@ -1,15 +1,17 @@
 mod cube;
 mod logic_core;
+mod options;
 mod orbital_sphere;
 mod prismatic;
 mod ui;
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use cube::CubeScene;
 use egui_wgpu::{Renderer as EguiRenderer, RendererOptions, ScreenDescriptor};
 use logic_core::LogicCoreScene;
+use options::Options;
 use orbital_sphere::OrbitalSphereScene;
 use prismatic::PrismaticScene;
 use ui::{Experience, UiLayout};
@@ -18,7 +20,7 @@ use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{Window, WindowAttributes, WindowId};
+use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth24Plus;
 
@@ -65,10 +67,12 @@ struct Renderer {
     egui_renderer: EguiRenderer,
     experience: Experience,
     started_at: Instant,
+    screensaver: bool,
+    rotation: Option<Duration>,
 }
 
 impl Renderer {
-    async fn new(window: Arc<Window>) -> Result<Self, String> {
+    async fn new(window: Arc<Window>, options: Options) -> Result<Self, String> {
         let size = window.inner_size();
         let instance = wgpu::Instance::default();
         let surface = instance
@@ -153,8 +157,10 @@ impl Renderer {
             egui_context,
             egui_state,
             egui_renderer,
-            experience: Experience::LogicCore,
+            experience: options.scene,
             started_at: Instant::now(),
+            screensaver: options.screensaver,
+            rotation: options.rotation,
         })
     }
 
@@ -207,12 +213,20 @@ impl Renderer {
     }
 
     fn render(&mut self) -> RenderOutcome {
+        if self.screensaver
+            && let Some(rotation) = self.rotation
+            && self.started_at.elapsed() >= rotation
+        {
+            self.experience = self.experience.next();
+            self.started_at = Instant::now();
+        }
+
         let raw_input = self.egui_state.take_egui_input(&self.window);
         let elapsed = self.started_at.elapsed().as_secs_f32();
         let mut experience = self.experience;
         let mut layout = UiLayout::default();
         let mut full_output = self.egui_context.run_ui(raw_input, |root_ui| {
-            layout = ui::draw(root_ui, &mut experience, elapsed);
+            layout = ui::draw(root_ui, &mut experience, elapsed, self.screensaver);
         });
         self.experience = experience;
         self.egui_state
@@ -372,9 +386,46 @@ enum RenderOutcome {
     Fatal,
 }
 
-#[derive(Default)]
 struct App {
+    options: Options,
     renderer: Option<Renderer>,
+    last_pointer: Option<PhysicalPosition<f64>>,
+    focused_once: bool,
+    next_frame: Instant,
+}
+
+impl App {
+    fn new(options: Options) -> Self {
+        Self {
+            options,
+            renderer: None,
+            last_pointer: None,
+            focused_once: false,
+            next_frame: Instant::now(),
+        }
+    }
+
+    fn dismisses_screensaver(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::Focused(true) => {
+                self.focused_once = true;
+                false
+            }
+            WindowEvent::Focused(false) => self.focused_once,
+            WindowEvent::CursorMoved { position, .. } => {
+                let previous = self.last_pointer.replace(*position);
+                previous.is_some_and(|previous| {
+                    self.focused_once
+                        && ((position.x - previous.x).abs() > 2.0
+                            || (position.y - previous.y).abs() > 2.0)
+                })
+            }
+            WindowEvent::KeyboardInput { event, .. } => event.state == ElementState::Pressed,
+            WindowEvent::MouseInput { state, .. } => *state == ElementState::Pressed,
+            WindowEvent::MouseWheel { .. } | WindowEvent::Touch(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl ApplicationHandler for App {
@@ -383,12 +434,36 @@ impl ApplicationHandler for App {
             return;
         }
 
-        let attributes = WindowAttributes::default()
+        let mut attributes = WindowAttributes::default()
             .with_title("Native WebGPU Experiences")
             .with_position(PhysicalPosition::new(180, 100))
             .with_inner_size(PhysicalSize::new(1280, 800));
+        if self.options.screensaver {
+            attributes = attributes
+                .with_title("Native WebGPU Screensaver")
+                .with_decorations(false)
+                .with_fullscreen(Some(Fullscreen::Borderless(None)));
+            #[cfg(target_os = "linux")]
+            {
+                attributes = winit::platform::wayland::WindowAttributesExtWayland::with_name(
+                    attributes,
+                    "org.omarchy.screensaver",
+                    "org.omarchy.screensaver",
+                );
+                attributes = winit::platform::x11::WindowAttributesExtX11::with_name(
+                    attributes,
+                    "org.omarchy.screensaver",
+                    "org.omarchy.screensaver",
+                );
+            }
+        }
         let window = match event_loop.create_window(attributes) {
-            Ok(window) => Arc::new(window),
+            Ok(window) => {
+                if self.options.screensaver {
+                    window.set_cursor_visible(false);
+                }
+                Arc::new(window)
+            }
             Err(error) => {
                 log::error!("failed to create window: {error}");
                 event_loop.exit();
@@ -396,7 +471,7 @@ impl ApplicationHandler for App {
             }
         };
 
-        match pollster::block_on(Renderer::new(window)) {
+        match pollster::block_on(Renderer::new(window, self.options)) {
             Ok(renderer) => self.renderer = Some(renderer),
             Err(error) => {
                 log::error!("{error}");
@@ -411,10 +486,18 @@ impl ApplicationHandler for App {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let Some(renderer) = self.renderer.as_mut() else {
+        let Some(renderer) = self.renderer.as_ref() else {
             return;
         };
-        if renderer.window.id() != window_id || renderer.handle_input(&event) {
+        if renderer.window.id() != window_id {
+            return;
+        }
+        if self.options.screensaver && self.dismisses_screensaver(&event) {
+            event_loop.exit();
+            return;
+        }
+        let renderer = self.renderer.as_mut().expect("renderer checked above");
+        if renderer.handle_input(&event) {
             return;
         }
 
@@ -439,17 +522,37 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         if let Some(renderer) = &self.renderer {
-            renderer.window.request_redraw();
+            if self.options.screensaver {
+                let now = Instant::now();
+                if now >= self.next_frame {
+                    renderer.window.request_redraw();
+                    self.next_frame = now + Duration::from_millis(33);
+                }
+                event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
+            } else {
+                renderer.window.request_redraw();
+            }
         }
     }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        print!("{}", options::HELP);
+        return Ok(());
+    }
+    let options = Options::parse(args)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
     let event_loop = EventLoop::new()?;
-    event_loop.set_control_flow(ControlFlow::Poll);
-    event_loop.run_app(&mut App::default())?;
+    event_loop.set_control_flow(if options.screensaver {
+        ControlFlow::Wait
+    } else {
+        ControlFlow::Poll
+    });
+    event_loop.run_app(&mut App::new(options))?;
     Ok(())
 }
