@@ -41,7 +41,9 @@ The installer copies the binary to `~/.local/bin/wgputests-screensaver` and
 clones Omarchy's idle service into your user configuration. It changes the
 service root to Quickshell `Scope` so its idle monitor runs as a headless user
 plugin, then changes the screensaver launch command. Omarchy continues to own
-the idle and lock timers.
+the idle and lock timers. It also adds a Hyprland rule so the interactive
+gallery inhibits the screensaver while its window is open. Closing the gallery
+releases the inhibitor; the separate screensaver window does not match the rule.
 Each mode runs for three minutes by default. Set `WGPU_SCREENSAVER_SECONDS` in
 the shell environment to change that interval. Rebuild and rerun the installer
 after code changes. The Omarchy integration requires `ttfx`, `jq`, and one of

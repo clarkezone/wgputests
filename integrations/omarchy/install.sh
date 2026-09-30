@@ -8,6 +8,7 @@ binary="$repo_dir/target/release/native-3d-app"
 plugin_id="${USER:-$(id -un)}.idle"
 plugin_dir="$HOME/.config/omarchy/plugins/$plugin_id"
 config="$HOME/.config/omarchy/shell.json"
+hypr_config="$HOME/.config/hypr/hyprland.lua"
 
 [[ -x $binary ]] || {
   echo "Build first: cargo build --release" >&2
@@ -15,6 +16,10 @@ config="$HOME/.config/omarchy/shell.json"
 }
 [[ -f $config ]] || {
   echo "Omarchy shell configuration was not found: $config" >&2
+  exit 1
+}
+[[ -f $hypr_config ]] || {
+  echo "Hyprland configuration was not found: $hypr_config" >&2
   exit 1
 }
 
@@ -55,5 +60,19 @@ elif new not in source:
 path.write_text(source)
 PY
 
+if ! grep -Fq -- '-- wgputests interactive gallery idle inhibition' "$hypr_config"; then
+  hypr_backup="$hypr_config.bak.$(date +%Y%m%d-%H%M%S)"
+  cp -a "$hypr_config" "$hypr_backup"
+  echo "Saved Hyprland configuration to $hypr_backup"
+  cat >> "$hypr_config" <<'LUA'
+
+-- wgputests interactive gallery idle inhibition
+-- Hyprland releases the inhibitor when the gallery window closes.
+o.window({ title = "^Native WebGPU Experiences$" }, { idle_inhibit = "always" })
+LUA
+fi
+
+hyprctl reload
+hyprctl configerrors
 omarchy restart shell
-echo "Installed text and Rust scene rotation in $plugin_dir"
+echo "Installed text and Rust scene rotation in $plugin_dir with gallery idle inhibition"
