@@ -44,8 +44,8 @@ pub fn draw(root: &mut egui::Ui, sim: &mut Simulation) {
                     if ui.button("Empty").clicked() {sim.configure(Settings {nodes:0,..sim.settings});}
                 });
                 ui.separator();
-                let c=sim.counts();
-                ui.label(format!("{} sessions · {} workspaces\n{} agents",sim.settings.nodes*sim.settings.sessions,sim.settings.nodes*sim.settings.sessions*sim.settings.workspaces,c.iter().sum::<usize>()));
+                let totals=sim.summary();
+                ui.label(format!("{} sessions · {} workspaces\n{} agents",totals.sessions,totals.workspaces,totals.agents));
                 for entry in &crate::mesh_legend::ENTRIES {
                     ui.horizontal(|ui| {
                         let (rect, _) = ui.allocate_exact_size(egui::vec2(36.0, 32.0), egui::Sense::hover());

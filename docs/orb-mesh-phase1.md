@@ -251,3 +251,24 @@ Twenty tests, strict all-target clippy, formatting and the optimized Linux build
 passed. Native rendering was checked separately. Windows/macOS native acceptance,
 maximum-density performance and production RPC integration remain open. The
 user's current merge request supersedes the initial experiment-only branch plan.
+
+
+## Complete topology totals (2026-10-06)
+
+The bottom HUD lists nodes, sessions, workspaces, total agents, working agents,
+blocked agents and completed agents. Totals count current configured membership
+across the entire hierarchy; the coordinator is separate from member nodes.
+Departing entities do not inflate totals during their fade. Agent states sum to
+the total agent count, including after simulated state changes. The lab and HUD
+share the same summary.
+
+Whole count/label entries wrap into additional rows on narrow views. The key and
+callouts reserve the measured footer height; HUD wrapping does not resize the
+3D scene. Regression checks cover removed/empty hierarchy levels, leaf state
+changes, footer bounds, wrapping, key separation and stats with the lab hidden.
+
+Adversarial review checked totals versus fading membership, state/agent total
+consistency, hidden-lab rendering and footer/key/callout space reservation.
+Twenty-two tests, formatting, strict all-target clippy and the optimized Linux
+build passed. The native Linux view was inspected with all seven counts visible.
+Windows/macOS graphical acceptance remains open.

@@ -4,6 +4,7 @@ mod mesh_debug;
 mod mesh_legend;
 mod mesh_model;
 mod mesh_orb;
+mod mesh_stats;
 mod mesh_territory;
 mod orbital_sphere;
 mod prismatic;

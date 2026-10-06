@@ -59,7 +59,8 @@ pub struct Layout {
 }
 
 // Keep hierarchy and agent states on separate rows; wrap each group on narrow windows.
-pub fn layout(painter: &Painter, viewport: Rect) -> Layout {
+pub fn layout(painter: &Painter, viewport: Rect, bottom: f32) -> Layout {
+    let bottom = bottom.clamp(viewport.top(), viewport.bottom());
     let width = (viewport.width() - 40.0).max(1.0);
     let inner_width = (width - 16.0).max(1.0);
     let icon_width = if inner_width >= 360.0 && viewport.height() >= 280.0 {
@@ -89,14 +90,14 @@ pub fn layout(painter: &Painter, viewport: Rect) -> Layout {
     }
     let height = y + row_height + 16.0;
     // Do not overlap the title/footer or squeeze labels on undersized views.
-    if viewport.width() < 220.0 || height + 90.0 > viewport.height() {
+    if viewport.width() < 220.0 || height + 50.0 > bottom - viewport.top() {
         let margin = (viewport.width() * 0.05).min(20.0);
         let hint_height = viewport.height().min(16.0);
         return Layout {
             bounds: Rect::from_min_size(
                 pos2(
                     viewport.left() + margin,
-                    (viewport.bottom() - 40.0 - hint_height).max(viewport.top()),
+                    (bottom - hint_height).max(viewport.top()),
                 ),
                 vec2((viewport.width() - margin * 2.0).max(1.0), hint_height),
             ),
@@ -105,7 +106,7 @@ pub fn layout(painter: &Painter, viewport: Rect) -> Layout {
         };
     }
     let bounds = Rect::from_min_size(
-        pos2(viewport.left() + 20.0, viewport.bottom() - 40.0 - height),
+        pos2(viewport.left() + 20.0, bottom - height),
         vec2(width, height),
     );
     for cell in &mut cells {
@@ -288,7 +289,7 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    let key = layout(ui.painter(), viewport);
+                    let key = layout(ui.painter(), viewport, viewport.bottom() - 40.0);
                     let Layout {
                         bounds,
                         cells,
@@ -327,7 +328,7 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    let key = layout(ui.painter(), viewport);
+                    let key = layout(ui.painter(), viewport, viewport.bottom() - 40.0);
                     assert!(viewport.contains_rect(key.bounds));
                     assert!(key.cells.is_empty());
                     draw(ui.painter(), &key, 0.0);

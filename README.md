@@ -4,6 +4,8 @@ The gallery opens **Mesh Orb**, a synthetic mesh visualization lab based on the
 Orbital Sphere experience. Run `cargo run --locked`. Use the left panel to vary
 nodes, sessions, workspaces, agents and agent states; counts animate arrivals
 and departures. `H` hides controls, `Space` pauses and `P` triggers a pulse.
+The bottom stats show total nodes, sessions, workspaces and agents, plus working,
+blocked and completed agents; entries wrap as the viewport narrows.
 
 [Experiment design, controls and verification](docs/orb-mesh-phase1.md).
 
