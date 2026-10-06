@@ -12,10 +12,15 @@ pub struct Geometry {
     pub lines: Vec<LineVertex>,
 }
 
+pub fn camera_distance(viewport: Viewport) -> f32 {
+    let aspect = viewport.width / viewport.height.max(1.0);
+    let half = (45.0_f32.to_radians() * 0.5).tan();
+    3.55 / (half * aspect.clamp(0.01, 1.0)) + 0.5
+}
 pub fn camera(time: f32, viewport: Viewport) -> (Mat4, Mat4, f32) {
     let aspect = viewport.width / viewport.height.max(1.0);
     let half = (45.0_f32.to_radians() * 0.5).tan();
-    let z = 3.55 / (half * aspect.clamp(0.01, 1.0)) + 0.5;
+    let z = camera_distance(viewport);
     let projection =
         glam::camera::rh::proj::directx::perspective(45_f32.to_radians(), aspect, 0.1, 1000.0);
     let view = glam::camera::rh::view::look_at_mat4(Vec3::new(0.0, 0.0, z), Vec3::ZERO, Vec3::Y);
@@ -65,30 +70,29 @@ fn circle(center: Vec3, radius: f32, angle: f32) -> Vec3 {
 }
 pub fn position(id: Id, time: f32) -> Vec3 {
     let (n, s, w, a) = id.indices();
-    let node = orbit(
-        n % 6,
-        noise(n as u32 + 131) * TAU + time * (0.025 + noise(n as u32 + 91) * 0.018),
-        time,
-    );
     if matches!(id, Id::Node(..)) {
-        return node;
+        return orbit(
+            n % 6,
+            noise(n as u32 + 131) * TAU + time * (0.025 + noise(n as u32 + 91) * 0.018),
+            time,
+        );
     }
-    let normal = node.normalize();
+    let normal = crate::mesh_territory::anchor(n);
     let (u, v) = basis(normal);
     let session = (normal
-        + 0.3 * (u * (s as f32 * TAU / 4.0 + 0.4).cos() + v * (s as f32 * TAU / 4.0 + 0.4).sin()))
+        + 0.22 * (u * (s as f32 * TAU / 4.0 + 0.4).cos() + v * (s as f32 * TAU / 4.0 + 0.4).sin()))
     .normalize()
         * 1.92;
     if matches!(id, Id::Session(..)) {
         return session;
     }
-    let workspace = circle(session, 0.19, w as f32 * TAU / 8.0 + 0.2);
+    let workspace = circle(session, 0.16, w as f32 * TAU / 8.0 + 0.2);
     if matches!(id, Id::Workspace(..)) {
         return workspace;
     }
     circle(
         workspace,
-        0.065,
+        0.05,
         a as f32 * TAU / 16.0 + noise(id.seed() + 31) * 0.1,
     )
 }
@@ -462,7 +466,20 @@ mod tests {
     fn placement_stays_stable_as_counts_change_and_projects_resize() {
         let id = Id::Agent(2, 1, 2, 3);
         let p = position(id, 2.0);
-        assert_eq!(p, position(id, 2.0));
+        // Surface placement does not follow a worker's changing orbital angle.
+        assert_eq!(p, position(id, 120.0));
+        assert_ne!(position(Id::Node(2), 2.0), position(Id::Node(2), 120.0));
+        let mut sim = Simulation::default();
+        sim.configure(Settings {
+            nodes: MAX_NODES,
+            ..sim.settings
+        });
+        assert!(
+            (p - visible_position(&sim, id)
+                / (1.0 + (1.0 - sim.entities[&id].alpha(sim.time)) * 0.15))
+                .length()
+                < 1e-5
+        );
         for (w, h) in [(1440.0, 900.0), (500.0, 900.0), (900.0, 200.0)] {
             let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(w, h));
             assert!(rect.contains(project(coordinator(2.0), 2.0, rect).unwrap()));

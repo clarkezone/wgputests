@@ -32,6 +32,10 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
 - Ice-blue workers moving on six fine 3D lattice orbits. Stable seeded locations
   avoid reshuffling existing objects as counts change; no real identities appear.
 - Violet session hubs on the inner particle globe, with concentric dot halos.
+  Workers own stable surface territories selected progressively from equal-area
+  Fibonacci candidates, filling the largest remaining angular gaps. Clusters
+  rotate with the globe independently of satellite orbits; adding/removing workers
+  preserves existing territories and scoped entity placement.
 - Indigo workspace centers arranged around each session, with adjacent rings of
   agent dots around them. Cyan agents work/breathe, amber agents are blocked,
   green agents are completed.
@@ -39,7 +43,12 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
   from workers to the coordinator. Three-second colored ripples/pulses travel
   from a changed leaf through its session/worker to the gold root.
 - Additive core/halo particles use the source Orbital Sphere WGSL renderer.
-  Dimmer source particles supply the ambient geometric sphere pattern.
+  Dimmer source particles supply the ambient geometric sphere pattern. Rear
+  clusters, pulses and connections fade smoothly in brightness, with weaker halos
+  and modest dot-size falloff. A faint alpha-blended blue atmospheric shell sits
+  between rear and front layers; rear clusters remain visible through the globe.
+  Depth changes preserve status hues and feather across the middle of the globe.
+  The original Orbital Sphere retains its original glow and pixel-size behavior.
 - Anonymous callouts track a projected 3D anchor with elbow leaders, corner
   brackets, a typewriter heading, scan line, entrance easing and fade out.
   Cards drift as flat screen-facing overlays; perspective 3D cards and richer
@@ -71,6 +80,7 @@ source cancels the pulse. The coordinator is separate from all worker counts.
 
 - `mesh_model.rs`: bounded synthetic hierarchy, stable identity, lifetimes,
   state changes, simulation clock and event/pulse queues.
+- `mesh_territory.rs`: cached, progressively dispersed stable sphere anchors.
 - `mesh_orb.rs`: pure geometry, 3D hierarchy paths, pulse stages, camera and
   projected callouts.
 - `mesh_debug.rs`: control panel bound to the model.
@@ -103,3 +113,14 @@ experiment. The inherited cross-platform shell and existing scenes remain in
 source. Future iterations should refine constellation spacing at high density,
 world-space callout motion and overlap, and the visual distinction between
 workspace and session layers before phase 2 integration.
+
+## Dispersion and depth iteration (2026-10-06)
+
+Twelve tests, formatting, strict all-target clippy and the optimized Linux build
+passed after the territory/depth changes. Tests verify both-side coverage and
+angular separation for increasing worker counts, preserved existing anchors,
+independence of surface placement from satellite motion, and existing maximum
+geometry/viewport bounds. The revised renderer and its rear/shell/front pipelines
+were inspected in a native GPU window; the capture above reflects this iteration.
+Native Windows/macOS acceptance remains open. The synthetic model, pulse timing
+and phase 1/phase 2 integration boundary remain the same.

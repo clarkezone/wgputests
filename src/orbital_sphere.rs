@@ -15,6 +15,7 @@ struct SceneUniforms {
     view_projection: [[f32; 4]; 4],
     group_model: [[f32; 4]; 4],
     viewport_brightness: [f32; 4],
+    camera_depth: [f32; 4],
 }
 
 #[repr(C)]
@@ -86,6 +87,11 @@ struct Orbit {
 pub struct OrbitalSphereScene {
     particle_pipeline: wgpu::RenderPipeline,
     line_pipeline: wgpu::RenderPipeline,
+    mesh_particle_front: wgpu::RenderPipeline,
+    mesh_particle_back: wgpu::RenderPipeline,
+    mesh_line_front: wgpu::RenderPipeline,
+    mesh_line_back: wgpu::RenderPipeline,
+    veil_pipeline: wgpu::RenderPipeline,
     quad_buffer: wgpu::Buffer,
     quad_index_buffer: wgpu::Buffer,
     bloom_buffer: wgpu::Buffer,
@@ -116,6 +122,7 @@ impl OrbitalSphereScene {
                 view_projection: Mat4::IDENTITY.to_cols_array_2d(),
                 group_model: Mat4::IDENTITY.to_cols_array_2d(),
                 viewport_brightness: [1.0, 1.0, 1.45, 0.0],
+                camera_depth: [0.0; 4],
             }),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
@@ -157,68 +164,110 @@ impl OrbitalSphereScene {
                 operation: wgpu::BlendOperation::Add,
             },
         };
-        let particle_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("orbital sphere particle pipeline"),
+        let create_particles = |entry| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("orbital sphere particle pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("particle_vs"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(QuadVertex::layout()), Some(Particle::layout())],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some(entry),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: color_format,
+                        blend: Some(additive_blend),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    cull_mode: None,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: depth_format,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        let create_lines = |entry| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("orbital sphere line pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("line_vs"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(LineVertex::layout())],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some(entry),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: color_format,
+                        blend: Some(additive_blend),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::LineList,
+                    cull_mode: None,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: depth_format,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+
+        let particle_pipeline = create_particles("particle_fs");
+        let line_pipeline = create_lines("line_fs");
+        let mesh_particle_front = create_particles("front_particle_fs");
+        let mesh_particle_back = create_particles("rear_particle_fs");
+        let mesh_line_front = create_lines("front_line_fs");
+        let mesh_line_back = create_lines("rear_line_fs");
+        let veil_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("mesh translucent sphere veil"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: Some("particle_vs"),
+                entry_point: Some("veil_vs"),
                 compilation_options: Default::default(),
-                buffers: &[Some(QuadVertex::layout()), Some(Particle::layout())],
+                buffers: &[Some(QuadVertex::layout())],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: Some("particle_fs"),
+                entry_point: Some("veil_fs"),
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: color_format,
-                    blend: Some(additive_blend),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
-            primitive: wgpu::PrimitiveState {
-                cull_mode: None,
-                ..Default::default()
-            },
+            primitive: Default::default(),
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: depth_format,
                 depth_write_enabled: Some(false),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
-            multisample: Default::default(),
-            multiview_mask: None,
-            cache: None,
-        });
-        let line_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("orbital sphere line pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("line_vs"),
-                compilation_options: Default::default(),
-                buffers: &[Some(LineVertex::layout())],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("line_fs"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: color_format,
-                    blend: Some(additive_blend),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineList,
-                cull_mode: None,
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: depth_format,
-                depth_write_enabled: Some(false),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                depth_compare: Some(wgpu::CompareFunction::Always),
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
@@ -299,6 +348,11 @@ impl OrbitalSphereScene {
         Self {
             particle_pipeline,
             line_pipeline,
+            mesh_particle_front,
+            mesh_particle_back,
+            mesh_line_front,
+            mesh_line_back,
+            veil_pipeline,
             quad_buffer,
             quad_index_buffer,
             bloom_buffer,
@@ -360,6 +414,7 @@ impl OrbitalSphereScene {
                 view_projection: (projection * view).to_cols_array_2d(),
                 group_model: group_model.to_cols_array_2d(),
                 viewport_brightness: [viewport.width, viewport.height, 1.45, particle_scale],
+                camera_depth: [0.0; 4],
             }),
         );
 
@@ -419,6 +474,12 @@ impl OrbitalSphereScene {
                 view_projection: view_projection.to_cols_array_2d(),
                 group_model: group_model.to_cols_array_2d(),
                 viewport_brightness: [viewport.width, viewport.height, 1.45, scale],
+                camera_depth: [
+                    crate::mesh_orb::camera_distance(viewport),
+                    SPHERE_RADIUS * 1.1,
+                    1.0,
+                    0.0,
+                ],
             }),
         );
         let geometry = crate::mesh_orb::geometry(sim);
@@ -487,22 +548,42 @@ impl OrbitalSphereScene {
             );
         }
         pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.set_pipeline(&self.line_pipeline);
-        pass.set_vertex_buffer(0, self.orbit_buffer.slice(..));
-        pass.draw(0..self.line_count, 0..1);
-
-        pass.set_pipeline(&self.particle_pipeline);
-        pass.set_vertex_buffer(0, self.quad_buffer.slice(..));
-        pass.set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         if self.mesh {
-            pass.set_vertex_buffer(1, self.atmosphere_buffer.slice(..));
-            pass.draw_indexed(0..6, 0, 0..self.atmosphere_count);
+            self.draw_mesh_layer(&mut pass, &self.mesh_line_back, &self.mesh_particle_back);
+            pass.set_pipeline(&self.veil_pipeline);
+            pass.set_vertex_buffer(0, self.quad_buffer.slice(..));
+            pass.set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            pass.draw_indexed(0..6, 0, 0..1);
+            self.draw_mesh_layer(&mut pass, &self.mesh_line_front, &self.mesh_particle_front);
         } else {
+            pass.set_pipeline(&self.line_pipeline);
+            pass.set_vertex_buffer(0, self.orbit_buffer.slice(..));
+            pass.draw(0..self.line_count, 0..1);
+            pass.set_pipeline(&self.particle_pipeline);
+            pass.set_vertex_buffer(0, self.quad_buffer.slice(..));
+            pass.set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             pass.set_vertex_buffer(1, self.bloom_buffer.slice(..));
             pass.draw_indexed(0..6, 0, 0..self.particle_count);
             pass.set_vertex_buffer(1, self.particle_buffer.slice(..));
             pass.draw_indexed(0..6, 0, 0..self.particle_count);
+            pass.set_vertex_buffer(1, self.node_buffer.slice(..));
+            pass.draw_indexed(0..6, 0, 0..self.node_count);
         }
+    }
+    fn draw_mesh_layer<'a>(
+        &'a self,
+        pass: &mut wgpu::RenderPass<'a>,
+        lines: &'a wgpu::RenderPipeline,
+        particles: &'a wgpu::RenderPipeline,
+    ) {
+        pass.set_pipeline(lines);
+        pass.set_vertex_buffer(0, self.orbit_buffer.slice(..));
+        pass.draw(0..self.line_count, 0..1);
+        pass.set_pipeline(particles);
+        pass.set_vertex_buffer(0, self.quad_buffer.slice(..));
+        pass.set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        pass.set_vertex_buffer(1, self.atmosphere_buffer.slice(..));
+        pass.draw_indexed(0..6, 0, 0..self.atmosphere_count);
         pass.set_vertex_buffer(1, self.node_buffer.slice(..));
         pass.draw_indexed(0..6, 0, 0..self.node_count);
     }
