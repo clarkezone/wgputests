@@ -36,9 +36,13 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
   Fibonacci candidates, filling the largest remaining angular gaps. Clusters
   rotate with the globe independently of satellite orbits; adding/removing workers
   preserves existing territories and scoped entity placement.
-- Indigo workspace centers arranged around each session, with adjacent rings of
-  agent dots around them. Cyan agents work/breathe, amber agents are blocked,
-  green agents are completed.
+- Indigo diamond workspace hubs arranged around each session, with full rings
+  of agent dots around them. Successive child slots fill opposite sides and gaps
+  around the full circle, so small counts occupy the available area while earlier
+  positions stay fixed. Wider spacing separates sessions, workspaces and leaves;
+  faint spokes connect agents to their workspace. Cyan agents work/breathe, amber
+  agents are blocked, green agents are completed. Agent cores are crisp with
+  compact halos, and the decorative field is dimmed for semantic contrast.
 - Fine connections from session clusters to their worker, then curved paths
   from workers to the coordinator. Three-second colored ripples/pulses travel
   from a changed leaf through its session/worker to the gold root.
@@ -124,3 +128,15 @@ geometry/viewport bounds. The revised renderer and its rear/shell/front pipeline
 were inspected in a native GPU window; the capture above reflects this iteration.
 Native Windows/macOS acceptance remains open. The synthetic model, pulse timing
 and phase 1/phase 2 integration boundary remain the same.
+
+## Internal cluster legibility iteration (2026-10-06)
+
+Spread session centers further apart, widened workspace/agent rings, and replaced
+maximum-count angular packing with stable full-ring insertion. Workspace diamonds,
+larger session hubs, faint agent ownership spokes, compact agent halos and a
+quieter decorative field distinguish hierarchy levels and individual statuses.
+Thirteen tests cover the existing bounds plus full-ring coverage and projected
+agent separation in the default view. Format/clippy and the optimized Linux
+build passed; the refreshed native capture illustrates the iteration. Dense
+scenes and clusters viewed edge-on can still overlap in projection; this does not
+claim per-agent legibility for maximum synthetic counts in a small window.

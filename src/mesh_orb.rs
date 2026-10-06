@@ -6,7 +6,7 @@ use glam::{Mat4, Quat, Vec3};
 use std::f32::consts::{PI, TAU};
 
 pub const MAX_PARTICLES: usize = 60_000;
-pub const MAX_LINES: usize = 16_000;
+pub const MAX_LINES: usize = 48_000;
 pub struct Geometry {
     pub particles: Vec<Particle>,
     pub lines: Vec<LineVertex>,
@@ -68,6 +68,12 @@ fn circle(center: Vec3, radius: f32, angle: f32) -> Vec3 {
     let (u, v) = basis(center.normalize());
     center + radius * (u * angle.cos() + v * angle.sin())
 }
+// Dyadic angular insertion fills the whole ring for small child counts while
+// preserving every earlier slot when children arrive or depart.
+fn child_angle(slot: usize) -> f32 {
+    ((slot as u32).reverse_bits() as f64 / 4_294_967_296.0) as f32 * TAU
+}
+
 pub fn position(id: Id, time: f32) -> Vec3 {
     let (n, s, w, a) = id.indices();
     if matches!(id, Id::Node(..)) {
@@ -80,21 +86,17 @@ pub fn position(id: Id, time: f32) -> Vec3 {
     let normal = crate::mesh_territory::anchor(n);
     let (u, v) = basis(normal);
     let session = (normal
-        + 0.22 * (u * (s as f32 * TAU / 4.0 + 0.4).cos() + v * (s as f32 * TAU / 4.0 + 0.4).sin()))
+        + 0.45 * (u * (child_angle(s) + 0.4).cos() + v * (child_angle(s) + 0.4).sin()))
     .normalize()
         * 1.92;
     if matches!(id, Id::Session(..)) {
         return session;
     }
-    let workspace = circle(session, 0.16, w as f32 * TAU / 8.0 + 0.2);
+    let workspace = circle(session, 0.42, child_angle(w) + 0.2);
     if matches!(id, Id::Workspace(..)) {
         return workspace;
     }
-    circle(
-        workspace,
-        0.05,
-        a as f32 * TAU / 16.0 + noise(id.seed() + 31) * 0.1,
-    )
+    circle(workspace, 0.15, child_angle(a) + 0.35)
 }
 fn visible_position(sim: &Simulation, id: Id) -> Vec3 {
     let pos = position(id, sim.time);
@@ -111,20 +113,34 @@ fn arc(start: Vec3, end: Vec3, t: f32, bulge: f32) -> Vec3 {
 }
 impl Geometry {
     fn dot(&mut self, pos: Vec3, size: f32, color: [f32; 3], alpha: f32) {
+        self.dot_with_halo(pos, size, color, alpha, 3.4, 0.13);
+    }
+    fn agent_dot(&mut self, pos: Vec3, color: [f32; 3], alpha: f32) {
+        self.dot_with_halo(pos, 2.3, color, alpha, 1.8, 0.045);
+    }
+    fn dot_with_halo(
+        &mut self,
+        pos: Vec3,
+        size: f32,
+        color: [f32; 3],
+        alpha: f32,
+        halo_size: f32,
+        halo_strength: f32,
+    ) {
         if alpha <= 0.001 {
             return;
         }
-        // Billboards share the original sphere shader's additive halo/core.
+        // Compact agent halos preserve the gap between adjacent status dots.
         self.particles.push(Particle {
             position_size: [pos.x, pos.y, pos.z, size * (0.4 + 0.6 * alpha)],
             color_softness: [color[0] * alpha, color[1] * alpha, color[2] * alpha, 0.92],
         });
         self.particles.push(Particle {
-            position_size: [pos.x, pos.y, pos.z, size * 3.4],
+            position_size: [pos.x, pos.y, pos.z, size * halo_size],
             color_softness: [
-                color[0] * alpha * 0.13,
-                color[1] * alpha * 0.13,
-                color[2] * alpha * 0.13,
+                color[0] * alpha * halo_strength,
+                color[1] * alpha * halo_strength,
+                color[2] * alpha * halo_strength,
                 0.03,
             ],
         });
@@ -190,7 +206,7 @@ pub fn geometry(sim: &Simulation) -> Geometry {
                 g.curve(p, root, [0.3, 0.13, 0.7], alpha * 0.28, 0.5);
             }
             Id::Session(n, _) => {
-                g.dot(p, 3.3, [0.7, 0.32, 1.0], alpha);
+                g.dot(p, 4.4, [0.7, 0.32, 1.0], alpha);
                 g.curve(
                     p,
                     visible_position(sim, Id::Node(n)),
@@ -200,7 +216,7 @@ pub fn geometry(sim: &Simulation) -> Geometry {
                 );
                 for i in 0..24 {
                     g.dot(
-                        circle(p, 0.10, i as f32 * TAU / 24.0),
+                        circle(p, 0.16, i as f32 * TAU / 24.0),
                         0.9,
                         [0.5, 0.15, 0.9],
                         alpha * 0.6,
@@ -208,7 +224,18 @@ pub fn geometry(sim: &Simulation) -> Geometry {
                 }
             }
             Id::Workspace(n, s, _) => {
-                g.dot(p, 2.0, [0.22, 0.35, 0.9], alpha);
+                // Hollow diamond makes the workspace distinct from agent dots.
+                let diamond =
+                    std::array::from_fn::<_, 4, _>(|i| circle(p, 0.065, i as f32 * TAU / 4.0));
+                for i in 0..4 {
+                    g.line(
+                        diamond[i],
+                        diamond[(i + 1) % 4],
+                        [0.25, 0.5, 1.0],
+                        alpha * 0.8,
+                    );
+                }
+                g.dot(p, 1.3, [0.22, 0.35, 0.9], alpha * 0.6);
                 g.line(
                     p,
                     visible_position(sim, Id::Session(n, s)),
@@ -225,7 +252,14 @@ pub fn geometry(sim: &Simulation) -> Geometry {
                     AgentState::Blocked => 0.85 + 0.15 * (time * 0.9).sin(),
                     AgentState::Completed => 0.6,
                 };
-                g.dot(p, 1.7, state.color(), alpha * breathing);
+                let (n, s, w, _) = id.indices();
+                g.line(
+                    visible_position(sim, Id::Workspace(n, s, w)),
+                    p,
+                    [0.12, 0.3, 0.45],
+                    alpha * 0.22,
+                );
+                g.agent_dot(p, state.color(), alpha * breathing);
             }
         }
     }
@@ -434,6 +468,34 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
 mod tests {
     use super::*;
     use crate::mesh_model::{MAX_AGENTS, MAX_NODES, MAX_SESSIONS, MAX_WORKSPACES, Settings};
+    #[test]
+    fn small_agent_rings_are_distributed_and_readable_in_the_default_view() {
+        let workspace = position(Id::Workspace(0, 0, 0), 0.0);
+        let agents = (0..6)
+            .map(|a| position(Id::Agent(0, 0, 0, a), 0.0))
+            .collect::<Vec<_>>();
+        // Six occupied slots span the whole circle, instead of one short arc.
+        let center = agents.iter().copied().sum::<Vec3>() / agents.len() as f32;
+        assert!((center - workspace).length() < 1e-5);
+        let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(640.0, 460.0));
+        for (i, a) in agents.iter().enumerate() {
+            for b in &agents[i + 1..] {
+                assert!(
+                    project(*a, 0.0, rect)
+                        .unwrap()
+                        .distance(project(*b, 0.0, rect).unwrap())
+                        > 4.0
+                );
+            }
+        }
+        // Different workspaces/sessions have breathing room around their leaves.
+        assert!(
+            position(Id::Workspace(0, 0, 0), 0.0).distance(position(Id::Workspace(0, 0, 2), 0.0))
+                > 0.59
+        );
+        assert!(position(Id::Session(0, 0), 0.0).distance(position(Id::Session(0, 1), 0.0)) > 1.5);
+    }
+
     #[test]
     fn maximum_scene_and_departures_fit_gpu_buffers() {
         let mut s = Simulation::default();

@@ -46,7 +46,7 @@ pub fn draw(root: &mut egui::Ui, sim: &mut Simulation) {
                 ui.separator();
                 let c=sim.counts();
                 ui.label(format!("{} sessions · {} workspaces\n{} agents",sim.settings.nodes*sim.settings.sessions,sim.settings.nodes*sim.settings.sessions*sim.settings.workspaces,c.iter().sum::<usize>()));
-                for (text,color) in [("● Coordinator / gold",Color32::from_rgb(255,184,55)),("● Worker / ice blue",Color32::from_rgb(87,176,255)),("● Session / violet",Color32::from_rgb(190,112,255)),("● Workspace / indigo",Color32::from_rgb(103,130,232)),("● Working / cyan",Color32::from_rgb(35,209,255)),("● Blocked / amber",Color32::from_rgb(255,116,35)),("● Completed / green",Color32::from_rgb(67,227,121))] {ui.colored_label(color,text);}
+                for (text,color) in [("● Coordinator / gold",Color32::from_rgb(255,184,55)),("● Worker / ice blue",Color32::from_rgb(87,176,255)),("◎ Session / violet",Color32::from_rgb(190,112,255)),("◇ Workspace / indigo",Color32::from_rgb(103,130,232)),("● Working / cyan",Color32::from_rgb(35,209,255)),("● Blocked / amber",Color32::from_rgb(255,116,35)),("● Completed / green",Color32::from_rgb(67,227,121))] {ui.colored_label(color,text);}
                 ui.separator(); ui.small("H hides this panel. Space pauses. P triggers activity.\nCounts reshape the scene over 1.2 s; pulses travel leaf → session → worker → coordinator in 3 s.");
             });
         });
