@@ -3,6 +3,9 @@ use std::collections::{BTreeMap, VecDeque};
 
 pub const TRANSITION: f32 = 1.2;
 pub const PULSE_DURATION: f32 = 3.0;
+pub const CALLOUT_DURATION: f32 = 10.0;
+pub const CALLOUT_FADE: f32 = 1.2;
+pub const CALLOUT_REVEAL: f32 = 0.65;
 pub const MAX_NODES: usize = 24;
 pub const MAX_SESSIONS: usize = 4;
 pub const MAX_WORKSPACES: usize = 8;
@@ -118,7 +121,13 @@ impl AgentState {
 }
 pub fn ease(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
-    t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+    // f32 rounding can push the polynomial just outside opacity bounds near 1.
+    (t * t * t * (t * (t * 6.0 - 15.0) + 10.0)).clamp(0.0, 1.0)
+}
+
+pub fn callout_opacity(age: f32) -> f32 {
+    ease(age / CALLOUT_REVEAL)
+        * (1.0 - ease((age - (CALLOUT_DURATION - CALLOUT_FADE)) / CALLOUT_FADE))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -150,6 +159,8 @@ pub struct Pulse {
 }
 #[derive(Clone, Debug)]
 pub struct Event {
+    // Stable placement/animation phase while newer events enter the queue.
+    pub serial: u64,
     pub origin: Id,
     pub started: f32,
     pub title: &'static str,
@@ -262,7 +273,7 @@ impl Simulation {
         self.entities
             .retain(|_, life| life.entering() || time - life.since < TRANSITION);
         self.pulses.retain(|p| time - p.started < PULSE_DURATION);
-        self.events.retain(|e| time - e.started < 6.0);
+        self.events.retain(|e| time - e.started < CALLOUT_DURATION);
         if self.auto_activity && self.running && time >= self.next_beat {
             self.trigger();
             self.next_beat = time + self.period.clamp(3.0, 15.0);
@@ -348,10 +359,15 @@ impl Simulation {
         self.event(id, title, text, state.color());
     }
     fn event(&mut self, origin: Id, title: &'static str, text: String, color: [f32; 3]) {
+        let serial = self
+            .events
+            .back()
+            .map_or(0, |event| event.serial.wrapping_add(1));
         if self.events.len() >= 3 {
             self.events.pop_front();
         }
         self.events.push_back(Event {
+            serial,
             origin,
             started: self.time,
             title,
@@ -364,6 +380,45 @@ impl Simulation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn callouts_remain_readable_after_six_seconds_and_expire_at_ten() {
+        let mut sim = Simulation {
+            auto_activity: false,
+            ..Default::default()
+        };
+        sim.events.clear();
+        sim.trigger();
+        let serial = sim.events[0].serial;
+        tick(&mut sim, 8.0);
+        assert_eq!(sim.events[0].serial, serial);
+        assert_eq!(callout_opacity(sim.time - sim.events[0].started), 1.0);
+        sim.running = false;
+        tick(&mut sim, 12.0);
+        assert_eq!(callout_opacity(sim.time - sim.events[0].started), 1.0);
+        sim.running = true;
+        tick(&mut sim, 1.5);
+        assert_eq!(sim.events.len(), 1);
+        let opacity = callout_opacity(sim.time - sim.events[0].started);
+        assert!(opacity > 0.0 && opacity < 1.0);
+        tick(&mut sim, 0.6);
+        assert!(sim.events.is_empty());
+        assert_eq!(callout_opacity(CALLOUT_DURATION), 0.0);
+    }
+
+    #[test]
+    fn bounded_queue_preserves_retained_callout_placement_identity() {
+        let mut sim = Simulation::default();
+        let first = sim.events.back().unwrap().serial;
+        sim.trigger();
+        assert_eq!(sim.events.front().unwrap().serial, first);
+        let retained = sim.events.back().unwrap().serial;
+        sim.trigger();
+        sim.trigger();
+        assert_eq!(sim.events.len(), 3);
+        assert_eq!(sim.events.front().unwrap().serial, retained);
+        assert_eq!(sim.events.back().unwrap().serial, retained + 2);
+    }
+
     #[test]
     fn attention_event_identifies_every_level_of_the_origin() {
         let mut sim = Simulation::default();

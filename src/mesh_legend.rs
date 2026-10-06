@@ -88,6 +88,22 @@ pub fn layout(painter: &Painter, viewport: Rect) -> Layout {
         x += cell_width + 10.0;
     }
     let height = y + row_height + 16.0;
+    // Do not overlap the title/footer or squeeze labels on undersized views.
+    if viewport.width() < 220.0 || height + 90.0 > viewport.height() {
+        let margin = (viewport.width() * 0.05).min(20.0);
+        let hint_height = viewport.height().min(16.0);
+        return Layout {
+            bounds: Rect::from_min_size(
+                pos2(
+                    viewport.left() + margin,
+                    (viewport.bottom() - 40.0 - hint_height).max(viewport.top()),
+                ),
+                vec2((viewport.width() - margin * 2.0).max(1.0), hint_height),
+            ),
+            cells: Vec::new(),
+            icon_width: 0.0,
+        };
+    }
     let bounds = Rect::from_min_size(
         pos2(viewport.left() + 20.0, viewport.bottom() - 40.0 - height),
         vec2(width, height),
@@ -183,6 +199,17 @@ pub fn sample(painter: &Painter, glyph: Glyph, rect: Rect, time: f32) {
 
 pub fn draw(painter: &Painter, layout: &Layout, time: f32) {
     let bounds = layout.bounds;
+    if layout.cells.is_empty() {
+        let painter = painter.with_clip_rect(painter.clip_rect().intersect(bounds));
+        painter.text(
+            bounds.left_top(),
+            egui::Align2::LEFT_TOP,
+            "Enlarge view for key",
+            FontId::monospace(10.0),
+            Color32::from_gray(175),
+        );
+        return;
+    }
     painter.rect_filled(bounds, 4.0, Color32::from_rgba_unmultiplied(4, 12, 24, 230));
     painter.rect_stroke(
         bounds,
@@ -253,7 +280,7 @@ mod tests {
     #[test]
     fn key_wraps_without_overlapping_or_leaving_the_viewport() {
         let context = egui::Context::default();
-        for size in [vec2(280.0, 240.0), vec2(650.0, 460.0), vec2(1200.0, 200.0)] {
+        for size in [vec2(280.0, 320.0), vec2(650.0, 460.0), vec2(1200.0, 200.0)] {
             let viewport = Rect::from_min_size(pos2(45.0, 30.0), size);
             let mut output = context.run_ui(
                 egui::RawInput {
@@ -282,6 +309,27 @@ mod tests {
                         }
                     }
                     assert!(cells[HIERARCHY_COUNT].top() > cells[HIERARCHY_COUNT - 1].top());
+                    draw(ui.painter(), &key, 0.0);
+                },
+            );
+            output.textures_delta.clear();
+        }
+    }
+
+    #[test]
+    fn undersized_views_show_a_bounded_hint_instead_of_overlapping_labels() {
+        let context = egui::Context::default();
+        for size in [vec2(90.0, 240.0), vec2(320.0, 120.0), vec2(280.0, 240.0)] {
+            let viewport = Rect::from_min_size(pos2(45.0, 30.0), size);
+            let mut output = context.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(viewport),
+                    ..Default::default()
+                },
+                |ui| {
+                    let key = layout(ui.painter(), viewport);
+                    assert!(viewport.contains_rect(key.bounds));
+                    assert!(key.cells.is_empty());
                     draw(ui.painter(), &key, 0.0);
                 },
             );

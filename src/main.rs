@@ -186,6 +186,7 @@ impl Renderer {
 
         if let WindowEvent::KeyboardInput { event, .. } = event
             && event.state == ElementState::Pressed
+            && !event.repeat
         {
             match event.physical_key {
                 PhysicalKey::Code(KeyCode::Digit1) => {

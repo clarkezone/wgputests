@@ -5,7 +5,8 @@ It uses synthetic replacement state only: no Herdr library, daemon, RPC,
 Tailscale registration, repository binding or project names. The accepted
 brainstorm is `projects/herdr-tailmesh/Brainstorm/Orb visualization` in AI Core.
 Phase 2 will adapt the proven mesh observation/projection layer after visual
-iteration; this branch is not a production integration or a main-merge proposal.
+iteration. The user has approved merging this gallery experience into main;
+it remains a synthetic prototype, with production mesh integration deferred.
 
 ![Native Linux phase 1 rendering](orb-mesh-phase1.png)
 
@@ -61,13 +62,16 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
   magnified details and HUD radial meshes approximating the WGSL core/halo profile.
   The key stays visible in the scene when the lab panel is
   hidden. Hierarchy and agent states occupy separate rows that wrap on narrow
-  windows. Hierarchy order is Coordinator → Node → Session → Workspace → Agent,
+  windows; an undersized view shows an enlarge-view hint rather than overlapping
+  the title/footer or squeezing labels. Hierarchy order is Coordinator → Node → Session → Workspace → Agent,
   with a bracket from Agent to Working / Needs input / Completed. Nodes are the
   orbiting pearl-white satellites; agents are the smaller state-colored dots around
   each workspace diamond. Event cards leave room for the key and footer; very short viewports
   suppress cards when there is insufficient room.
 - Event callouts track a projected 3D anchor with elbow leaders, corner
-  brackets, a typewriter heading, scan line, entrance easing and fade out.
+  brackets, a typewriter heading, scan line, entrance easing and fade out. They
+  remain fully opaque until 8.8 seconds and fade during the final 1.2 seconds of
+  their ten-second lifetime. Existing cards keep their edge as newer events arrive.
   Cards drift as flat screen-facing overlays and grow to fit wrapped text. They
   stack independently along the two edges (one column in narrow views); only
   cards that fit above the key are shown. Attention cards show node, session,
@@ -94,7 +98,7 @@ Quiet, Busy, Blocked, Dense and Empty presets exercise common visual scenarios.
 Zero nodes leaves only the coordinator and ambient lattice. Zero sessions,
 workspaces or agents produces a valid truncated hierarchy. Arrival/departure and
 state changes generate callouts; the rolling queue is capped at three and
-expires after six seconds. One pulse per node is retained, and removal of its
+expires after ten simulation seconds (at the default playback speed, ten seconds). One pulse per node is retained, and removal of its
 source cancels the pulse. Multiple blocked agents remain amber simultaneously,
 and the blocked total includes every one of them. "Needs input" in the key is
 this prototype's blocked state. Callout expiration does not resolve an agent;
@@ -174,7 +178,7 @@ clippy and the optimized Linux build passed. New checks exercise key layout at
 narrow/wide/short sizes and verify every label is rendered with both the lab and
 callouts disabled. Native Linux rendering was inspected and the capture updated.
 Windows/macOS native acceptance remains open. Simultaneous blocked-agent state,
-the three-event/six-second callout window and per-node pulse behavior are
+the three-event/ten-second callout window and per-node pulse behavior are
 unchanged; this iteration adds no input notification queue or Herdr integration.
 
 
@@ -202,7 +206,7 @@ Attention callouts now include node/session/workspace/agent names, such as
 `node-06`, `session-02`, `workspace-03`, `agent-02`. These are generated synthetic
 names, scoped by the full path; real daemon names require phase 2 integration.
 Cards measure heading/body height, wrap text and stack without overlap above the
-key. The event queue remains capped at three and expires after six seconds; only
+key. The event queue remains capped at three and expires after ten seconds; only
 the newest cards fitting the available space are rendered.
 
 Seventeen tests, format, strict clippy and the optimized Linux build passed.
@@ -223,3 +227,27 @@ size, halo and state-breathing distinctions remain in place.
 Seventeen tests, formatting, strict clippy and the optimized Linux build passed;
 colors were inspected in the native view and the capture refreshed. Native
 Windows/macOS graphical acceptance remains open.
+
+
+## Merge review and ten-second callouts (2026-10-06)
+
+Callout expiry and fade share duration constants: 10 simulation seconds total,
+0.65-second entrance, then full opacity until the last 1.2 seconds. Playback pause
+freezes the lifetime; playback speed scales it. Queue pressure can still replace
+the oldest of three retained events earlier, and available space limits visible
+cards. This remains an event display, not a persistent input-request queue.
+
+Adversarial review covered the full main-to-branch diff: simulation lifetimes and
+limits, identity/state changes, layout and naming, GPU buffer capacity and shared
+scene switching, shader uniform compatibility, native input, and dependencies.
+Fixed retained cards switching sides when new events arrive by keeping stable
+placement identities; fixed undersized key overflow with a bounded resize hint;
+ignored auto-repeat for one-shot scene/playback shortcuts; and clamped easing
+output after a regression test exposed f32 opacity overshoot near an endpoint.
+Regression tests verify ten-second expiry/fade/pause, bounded event identity,
+small key views and existing geometry/placement constraints.
+
+Twenty tests, strict all-target clippy, formatting and the optimized Linux build
+passed. Native rendering was checked separately. Windows/macOS native acceptance,
+maximum-density performance and production RPC integration remain open. The
+user's current merge request supersedes the initial experiment-only branch plan.

@@ -1,6 +1,8 @@
 //! 3D constellation geometry and projected movie-style callouts.
 use crate::logic_core::Viewport;
-use crate::mesh_model::{AgentState, Id, PULSE_DURATION, Simulation, ease, noise};
+use crate::mesh_model::{
+    AgentState, CALLOUT_REVEAL, Id, PULSE_DURATION, Simulation, callout_opacity, ease, noise,
+};
 use crate::orbital_sphere::{LineVertex, Particle};
 use glam::{Mat4, Quat, Vec3};
 use std::f32::consts::{PI, TAU};
@@ -440,10 +442,10 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
         crate::mesh_legend::draw(&painter, &legend, sim.time);
         return;
     }
-    for (slot, event) in sim.events.iter().rev().enumerate() {
+    for event in sim.events.iter().rev() {
         let age = sim.time - event.started;
-        let reveal = ease(age / 0.65);
-        let opacity = reveal * (1.0 - ease((age - 4.8) / 1.2));
+        let reveal = ease(age / CALLOUT_REVEAL);
+        let opacity = callout_opacity(age);
         let col = egui::Color32::from_rgb(
             (event.color[0] * 255.0) as u8,
             (event.color[1] * 255.0) as u8,
@@ -467,14 +469,19 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
         );
         let body_top = 12.0 + header.size().y + 10.0;
         let height = (body_top + galley.size().y + 24.0).max(84.0);
-        let Some((card, left)) = callout_rect(rect, cards_bottom, &mut next_y, slot == 1, height)
-        else {
+        let Some((card, left)) = callout_rect(
+            rect,
+            cards_bottom,
+            &mut next_y,
+            event.serial.is_multiple_of(2),
+            height,
+        ) else {
             continue;
         };
         // HUD cards drift gently at the edges while their leaders track real 3D anchors.
         let card = card.translate(egui::vec2(
             (1.0 - reveal) * 22.0,
-            (sim.time * 0.24 + slot as f32).sin() * 9.0,
+            (sim.time * 0.24 + (event.serial % 3) as f32).sin() * 9.0,
         ));
         painter.rect_filled(
             card,
