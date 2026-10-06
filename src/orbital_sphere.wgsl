@@ -58,10 +58,12 @@ fn particle_fs(input: ParticleOutput) -> @location(0) vec4<f32> {
 
 struct LineInput {
     @location(0) position: vec3<f32>,
+    @location(1) color: vec4<f32>,
 };
 
 struct LineOutput {
     @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec4<f32>,
 };
 
 @vertex
@@ -70,10 +72,11 @@ fn line_vs(input: LineInput) -> LineOutput {
     output.clip_position = scene.view_projection
         * scene.group_model
         * vec4<f32>(input.position, 1.0);
+    output.color = input.color;
     return output;
 }
 
 @fragment
-fn line_fs() -> @location(0) vec4<f32> {
-    return vec4<f32>(0.31, 0.12, 0.82, 0.42) * scene.viewport_brightness.z;
+fn line_fs(input: LineOutput) -> @location(0) vec4<f32> {
+    return input.color * scene.viewport_brightness.z;
 }

@@ -1,5 +1,8 @@
 mod cube;
 mod logic_core;
+mod mesh_debug;
+mod mesh_model;
+mod mesh_orb;
 mod orbital_sphere;
 mod prismatic;
 mod ui;
@@ -65,6 +68,8 @@ struct Renderer {
     egui_renderer: EguiRenderer,
     experience: Experience,
     started_at: Instant,
+    last_frame: Instant,
+    mesh: mesh_model::Simulation,
 }
 
 impl Renderer {
@@ -153,8 +158,10 @@ impl Renderer {
             egui_context,
             egui_state,
             egui_renderer,
-            experience: Experience::LogicCore,
+            experience: Experience::MeshOrb,
             started_at: Instant::now(),
+            last_frame: Instant::now(),
+            mesh: Default::default(),
         })
     }
 
@@ -195,6 +202,22 @@ impl Renderer {
                     self.experience = Experience::Prismatic;
                     return true;
                 }
+                PhysicalKey::Code(KeyCode::Digit5) => {
+                    self.experience = Experience::MeshOrb;
+                    return true;
+                }
+                PhysicalKey::Code(KeyCode::KeyH) if self.experience == Experience::MeshOrb => {
+                    self.mesh.controls = !self.mesh.controls;
+                    return true;
+                }
+                PhysicalKey::Code(KeyCode::Space) if self.experience == Experience::MeshOrb => {
+                    self.mesh.running = !self.mesh.running;
+                    return true;
+                }
+                PhysicalKey::Code(KeyCode::KeyP) if self.experience == Experience::MeshOrb => {
+                    self.mesh.trigger();
+                    return true;
+                }
                 _ => {}
             }
         }
@@ -207,12 +230,30 @@ impl Renderer {
     }
 
     fn render(&mut self) -> RenderOutcome {
+        let now = Instant::now();
+        let delta = now.duration_since(self.last_frame).as_secs_f32();
+        self.last_frame = now;
+        if self.experience == Experience::MeshOrb {
+            self.mesh.advance(delta);
+        }
+        let (output, reconfigure_after_present) = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(texture) => (texture, false),
+            wgpu::CurrentSurfaceTexture::Suboptimal(texture) => (texture, true),
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                return RenderOutcome::Skipped;
+            }
+            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                return RenderOutcome::Reconfigure;
+            }
+            wgpu::CurrentSurfaceTexture::Validation => return RenderOutcome::Fatal,
+        };
+
         let raw_input = self.egui_state.take_egui_input(&self.window);
         let elapsed = self.started_at.elapsed().as_secs_f32();
         let mut experience = self.experience;
         let mut layout = UiLayout::default();
         let mut full_output = self.egui_context.run_ui(raw_input, |root_ui| {
-            layout = ui::draw(root_ui, &mut experience, elapsed);
+            layout = ui::draw(root_ui, &mut experience, elapsed, &mut self.mesh);
         });
         self.experience = experience;
         self.egui_state
@@ -229,17 +270,6 @@ impl Renderer {
             }
         }
 
-        let (output, reconfigure_after_present) = match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(texture) => (texture, false),
-            wgpu::CurrentSurfaceTexture::Suboptimal(texture) => (texture, true),
-            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
-                return RenderOutcome::Skipped;
-            }
-            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
-                return RenderOutcome::Reconfigure;
-            }
-            wgpu::CurrentSurfaceTexture::Validation => return RenderOutcome::Fatal,
-        };
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -272,6 +302,21 @@ impl Renderer {
                     .update(&self.queue, elapsed, viewport, &self.config);
                 self.orbital_sphere
                     .render(&mut encoder, &view, &self.depth_texture.view, viewport);
+            }
+            Experience::MeshOrb => {
+                let viewport = rect_to_pixels(
+                    layout.logic_viewport.expect("mesh viewport"),
+                    pixels_per_point,
+                    &self.config,
+                );
+                self.orbital_sphere
+                    .update_mesh(&self.queue, &self.mesh, viewport);
+                self.orbital_sphere.render(
+                    &mut encoder,
+                    &view,
+                    &self.depth_texture.view,
+                    Some(viewport),
+                );
             }
             Experience::Prismatic => {
                 let viewport = rect_to_pixels(
@@ -346,10 +391,10 @@ fn rect_to_pixels(
 ) -> logic_core::Viewport {
     let x = (rect.min.x * pixels_per_point)
         .round()
-        .clamp(0.0, config.width as f32);
+        .clamp(0.0, config.width.saturating_sub(1) as f32);
     let y = (rect.min.y * pixels_per_point)
         .round()
-        .clamp(0.0, config.height as f32);
+        .clamp(0.0, config.height.saturating_sub(1) as f32);
     let max_x = (rect.max.x * pixels_per_point)
         .round()
         .clamp(x, config.width as f32);
@@ -384,7 +429,7 @@ impl ApplicationHandler for App {
         }
 
         let attributes = WindowAttributes::default()
-            .with_title("Native WebGPU Experiences")
+            .with_title("Mesh Orb — Phase 1 Lab")
             .with_position(PhysicalPosition::new(180, 100))
             .with_inner_size(PhysicalSize::new(1280, 800));
         let window = match event_loop.create_window(attributes) {

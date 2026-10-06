@@ -1,3 +1,17 @@
+# Orb mesh experiment (phase 1)
+
+This branch opens **Mesh Orb**, a synthetic mesh visualization lab based on the
+Orbital Sphere experience. Run `cargo run --locked`. Use the left panel to vary
+nodes, sessions, workspaces, agents and agent states; counts animate arrivals
+and departures. `H` hides controls, `Space` pauses and `P` triggers a pulse.
+
+[Experiment design, controls and verification](docs/orb-mesh-phase1.md).
+
+The original gallery remains available through the selector (keys 1–4).
+This prototype has no herdr-mesh/RPC integration; that belongs to phase 2.
+
+---
+
 # Native 3D App
 
 A native Rust/WebGPU experience gallery for Windows, macOS, and Omarchy Linux.

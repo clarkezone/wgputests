@@ -19,9 +19,9 @@ struct SceneUniforms {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct Particle {
-    position_size: [f32; 4],
-    color_softness: [f32; 4],
+pub(crate) struct Particle {
+    pub position_size: [f32; 4],
+    pub color_softness: [f32; 4],
 }
 
 impl Particle {
@@ -57,12 +57,14 @@ impl QuadVertex {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct LineVertex {
-    position: [f32; 3],
+pub(crate) struct LineVertex {
+    pub position: [f32; 3],
+    pub color: [f32; 4],
 }
 
 impl LineVertex {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x3];
+    const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
+        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x4];
 
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -89,11 +91,16 @@ pub struct OrbitalSphereScene {
     bloom_buffer: wgpu::Buffer,
     particle_buffer: wgpu::Buffer,
     particle_count: u32,
+    atmosphere_buffer: wgpu::Buffer,
+    atmosphere_count: u32,
     node_buffer: wgpu::Buffer,
     orbit_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     orbits: [Orbit; ORBIT_COUNT],
+    node_count: u32,
+    line_count: u32,
+    mesh: bool,
 }
 
 impl OrbitalSphereScene {
@@ -252,15 +259,33 @@ impl OrbitalSphereScene {
             contents: bytemuck::cast_slice(&particles),
             usage: wgpu::BufferUsages::VERTEX,
         });
+        let atmosphere: Vec<Particle> = particles
+            .iter()
+            .step_by(2)
+            .flat_map(|p| {
+                let mut core = *p;
+                core.position_size[3] = 1.5;
+                core.color_softness = [0.075, 0.025, 0.15, 0.9];
+                let mut halo = core;
+                halo.position_size[3] = 4.0;
+                halo.color_softness = [0.015, 0.005, 0.03, 0.02];
+                [halo, core]
+            })
+            .collect();
+        let atmosphere_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("mesh orbital atmosphere"),
+            contents: bytemuck::cast_slice(&atmosphere),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
         let node_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("orbital sphere nodes"),
-            size: (std::mem::size_of::<Particle>() * 6) as u64,
+            size: (std::mem::size_of::<Particle>() * crate::mesh_orb::MAX_PARTICLES) as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         let orbit_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("orbital sphere orbit lines"),
-            size: (std::mem::size_of::<LineVertex>() * ORBIT_COUNT * ORBIT_SEGMENTS * 2) as u64,
+            size: (std::mem::size_of::<LineVertex>() * crate::mesh_orb::MAX_LINES) as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -279,16 +304,21 @@ impl OrbitalSphereScene {
             bloom_buffer,
             particle_buffer,
             particle_count: particles.len() as u32,
+            atmosphere_buffer,
+            atmosphere_count: atmosphere.len() as u32,
             node_buffer,
             orbit_buffer,
             uniform_buffer,
             bind_group,
             orbits,
+            node_count: 6,
+            line_count: (ORBIT_COUNT * ORBIT_SEGMENTS * 2) as u32,
+            mesh: false,
         }
     }
 
     pub fn update(
-        &self,
+        &mut self,
         queue: &wgpu::Queue,
         elapsed: f32,
         viewport: Option<Viewport>,
@@ -348,9 +378,11 @@ impl OrbitalSphereScene {
                 let end = orbit_point(orbit.radius, (segment + 1) as f32 / ORBIT_SEGMENTS as f32);
                 line_vertices.push(LineVertex {
                     position: rotation.transform_point3(start).to_array(),
+                    color: [0.31, 0.12, 0.82, 0.42],
                 });
                 line_vertices.push(LineVertex {
                     position: rotation.transform_point3(end).to_array(),
+                    color: [0.31, 0.12, 0.82, 0.42],
                 });
             }
             if let Some(angle) = orbit.node_angle {
@@ -366,8 +398,41 @@ impl OrbitalSphereScene {
                 });
             }
         }
+        self.node_count = nodes.len() as u32;
+        self.line_count = line_vertices.len() as u32;
+        self.mesh = false;
         queue.write_buffer(&self.orbit_buffer, 0, bytemuck::cast_slice(&line_vertices));
         queue.write_buffer(&self.node_buffer, 0, bytemuck::cast_slice(&nodes));
+    }
+
+    pub fn update_mesh(
+        &mut self,
+        queue: &wgpu::Queue,
+        sim: &crate::mesh_model::Simulation,
+        viewport: Viewport,
+    ) {
+        let (view_projection, group_model, scale) = crate::mesh_orb::camera(sim.time, viewport);
+        queue.write_buffer(
+            &self.uniform_buffer,
+            0,
+            bytemuck::bytes_of(&SceneUniforms {
+                view_projection: view_projection.to_cols_array_2d(),
+                group_model: group_model.to_cols_array_2d(),
+                viewport_brightness: [viewport.width, viewport.height, 1.45, scale],
+            }),
+        );
+        let geometry = crate::mesh_orb::geometry(sim);
+        self.node_count = geometry.particles.len() as u32;
+        self.line_count = geometry.lines.len() as u32;
+        self.mesh = true;
+        if !geometry.particles.is_empty() {
+            queue.write_buffer(
+                &self.node_buffer,
+                0,
+                bytemuck::cast_slice(&geometry.particles),
+            );
+        }
+        queue.write_buffer(&self.orbit_buffer, 0, bytemuck::cast_slice(&geometry.lines));
     }
 
     pub fn render(
@@ -424,17 +489,22 @@ impl OrbitalSphereScene {
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_pipeline(&self.line_pipeline);
         pass.set_vertex_buffer(0, self.orbit_buffer.slice(..));
-        pass.draw(0..(ORBIT_COUNT * ORBIT_SEGMENTS * 2) as u32, 0..1);
+        pass.draw(0..self.line_count, 0..1);
 
         pass.set_pipeline(&self.particle_pipeline);
         pass.set_vertex_buffer(0, self.quad_buffer.slice(..));
         pass.set_index_buffer(self.quad_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        pass.set_vertex_buffer(1, self.bloom_buffer.slice(..));
-        pass.draw_indexed(0..6, 0, 0..self.particle_count);
-        pass.set_vertex_buffer(1, self.particle_buffer.slice(..));
-        pass.draw_indexed(0..6, 0, 0..self.particle_count);
+        if self.mesh {
+            pass.set_vertex_buffer(1, self.atmosphere_buffer.slice(..));
+            pass.draw_indexed(0..6, 0, 0..self.atmosphere_count);
+        } else {
+            pass.set_vertex_buffer(1, self.bloom_buffer.slice(..));
+            pass.draw_indexed(0..6, 0, 0..self.particle_count);
+            pass.set_vertex_buffer(1, self.particle_buffer.slice(..));
+            pass.draw_indexed(0..6, 0, 0..self.particle_count);
+        }
         pass.set_vertex_buffer(1, self.node_buffer.slice(..));
-        pass.draw_indexed(0..6, 0, 0..6);
+        pass.draw_indexed(0..6, 0, 0..self.node_count);
     }
 }
 

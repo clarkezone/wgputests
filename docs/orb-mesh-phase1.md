@@ -1,0 +1,105 @@
+# Mesh Orb — phase 1 experiment
+
+This is a standalone wgputests experiment, based on the Orbital Sphere scene.
+It uses synthetic replacement state only: no Herdr library, daemon, RPC,
+Tailscale registration, repository binding or project names. The accepted
+brainstorm is `projects/herdr-tailmesh/Brainstorm/Orb visualization` in AI Core.
+Phase 2 will adapt the proven mesh observation/projection layer after visual
+iteration; this branch is not a production integration or a main-merge proposal.
+
+![Native Linux phase 1 rendering](orb-mesh-phase1.png)
+
+## Run
+
+```sh
+cargo run --locked
+```
+
+Mesh Orb opens by default. The original four gallery scenes remain accessible
+from the selector or keys 1–4; key 5 returns to the experiment. `H` hides/restores
+the debug panel, `Space` pauses/resumes, `P` triggers activity, and Escape exits.
+The optional Linux clipboard worker is disabled: a rendered smoke reproduced
+a `smithay-clipboard` / Wayland primary-selection teardown crash. Numeric
+controls still support direct keyboard entry; clipboard copy/paste is not
+part of this prototype. Windows/macOS clipboard feature selection is unchanged.
+
+On Windows use the native exe; the existing winit/wgpu backend choice continues
+to cover Windows, macOS and Linux. There is no browser or external renderer.
+
+## First-cut visual grammar
+
+- One gold coordinator, distinguished by its small orbiting crown.
+- Ice-blue workers moving on six fine 3D lattice orbits. Stable seeded locations
+  avoid reshuffling existing objects as counts change; no real identities appear.
+- Violet session hubs on the inner particle globe, with concentric dot halos.
+- Indigo workspace centers arranged around each session, with adjacent rings of
+  agent dots around them. Cyan agents work/breathe, amber agents are blocked,
+  green agents are completed.
+- Fine connections from session clusters to their worker, then curved paths
+  from workers to the coordinator. Three-second colored ripples/pulses travel
+  from a changed leaf through its session/worker to the gold root.
+- Additive core/halo particles use the source Orbital Sphere WGSL renderer.
+  Dimmer source particles supply the ambient geometric sphere pattern.
+- Anonymous callouts track a projected 3D anchor with elbow leaders, corner
+  brackets, a typewriter heading, scan line, entrance easing and fade out.
+  Cards drift as flat screen-facing overlays; perspective 3D cards and richer
+  typography/callout collision handling are visual iteration opportunities.
+
+## Debug controls
+
+Per-worker/session/workspace controls set up to 24 workers, four sessions per
+worker, eight workspaces per session and 16 agents per workspace. Working and
+blocked percentages seed the agent distribution; the rest are completed.
+Optional simulated events then change individual agent states, so the displayed
+counts can diverge from the seeded percentages. Turning simulation off freezes
+state evolution while the ambient animation continues.
+
+Membership changes fade and expand/collapse over 1.2 seconds with quintic easing.
+Reversing a change preserves the currently visible opacity. Completed departures
+are removed; entity positions remain stable. Playback pauses the simulation
+clock, including fades, callouts and pulses. Manual controls can still change
+state while paused, and the transitions continue on resume.
+
+Quiet, Busy, Blocked, Dense and Empty presets exercise common visual scenarios.
+Zero workers leaves only the coordinator and ambient lattice. Zero sessions,
+workspaces or agents produces a valid truncated hierarchy. Arrival/departure and
+state changes generate callouts; the rolling queue is capped at three and
+expires after six seconds. One pulse per worker is retained, and removal of its
+source cancels the pulse. The coordinator is separate from all worker counts.
+
+## Structure and checks
+
+- `mesh_model.rs`: bounded synthetic hierarchy, stable identity, lifetimes,
+  state changes, simulation clock and event/pulse queues.
+- `mesh_orb.rs`: pure geometry, 3D hierarchy paths, pulse stages, camera and
+  projected callouts.
+- `mesh_debug.rs`: control panel bound to the model.
+- `orbital_sphere.rs` / `.wgsl`: shared instanced GPU particles and colored lines.
+
+```sh
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo build --locked --release
+```
+
+Tests cover empty and maximum topology, rapid fade reversal, unchanged-target
+stability, pause, pulse cancellation, finite geometry, buffer bounds and camera
+projection under wide/narrow/short resizing. Native rendered inspection is
+separate from unit tests and platform compilation. Dense scenes deliberately
+expose overlap for phase 1 visual iteration; these synthetic limits are not
+production mesh limits or a proposed production data model.
+
+## Phase 1 verification (2026-10-06)
+
+Formatting, strict all-target clippy and ten tests passed. An optimized Linux
+executable was built and the GPU-rendered scene was inspected in a native
+Wayland window. The first smoke reproduced a Wayland clipboard-worker shutdown
+segfault; disabling that optional Linux feature yielded a clean subsequent
+process exit. No operating-system configuration was changed.
+
+Native Windows/macOS builds and graphical acceptance remain unverified for this
+experiment. The inherited cross-platform shell and existing scenes remain in
+source. Future iterations should refine constellation spacing at high density,
+world-space callout motion and overlap, and the visual distinction between
+workspace and session layers before phase 2 integration.

@@ -7,6 +7,7 @@ pub enum Experience {
     LogicCore,
     OrbitalSphere,
     Prismatic,
+    MeshOrb,
 }
 
 #[derive(Default)]
@@ -14,7 +15,12 @@ pub struct UiLayout {
     pub logic_viewport: Option<Rect>,
 }
 
-pub fn draw(root_ui: &mut egui::Ui, experience: &mut Experience, _elapsed: f32) -> UiLayout {
+pub fn draw(
+    root_ui: &mut egui::Ui,
+    experience: &mut Experience,
+    _elapsed: f32,
+    mesh: &mut crate::mesh_model::Simulation,
+) -> UiLayout {
     egui::Panel::top("experience_selector")
         .frame(
             egui::Frame::new()
@@ -35,6 +41,18 @@ pub fn draw(root_ui: &mut egui::Ui, experience: &mut Experience, _elapsed: f32) 
                 ui.with_layout(
                     Layout::right_to_left(Align::Center).with_main_wrap(true),
                     |ui| {
+                        selector_button(ui, experience, Experience::MeshOrb, "Mesh Orb", "5");
+                        if *experience == Experience::MeshOrb
+                            && ui
+                                .button(if mesh.controls {
+                                    "Hide lab"
+                                } else {
+                                    "Show lab"
+                                })
+                                .clicked()
+                        {
+                            mesh.controls = !mesh.controls;
+                        }
                         selector_button(ui, experience, Experience::Prismatic, "Prismatic", "4");
                         selector_button(
                             ui,
@@ -50,14 +68,26 @@ pub fn draw(root_ui: &mut egui::Ui, experience: &mut Experience, _elapsed: f32) 
             });
         });
 
+    if *experience == Experience::MeshOrb {
+        crate::mesh_debug::draw(root_ui, mesh);
+    }
+
     if matches!(
         *experience,
-        Experience::LogicCore | Experience::OrbitalSphere | Experience::Prismatic
+        Experience::LogicCore
+            | Experience::OrbitalSphere
+            | Experience::Prismatic
+            | Experience::MeshOrb
     ) {
         let mut viewport = Rect::NOTHING;
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(Color32::TRANSPARENT))
-            .show(root_ui, |ui| viewport = ui.available_rect_before_wrap());
+            .show(root_ui, |ui| {
+                viewport = ui.available_rect_before_wrap();
+                if *experience == Experience::MeshOrb {
+                    crate::mesh_orb::overlay(ui, mesh, viewport);
+                }
+            });
         UiLayout {
             logic_viewport: Some(viewport),
         }
@@ -115,5 +145,42 @@ fn selector_button(
         .corner_radius(9);
     if ui.add(button).clicked() {
         *selected = value;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mesh_model::Simulation;
+    fn frame(context: &egui::Context, sim: &mut Simulation, size: Vec2) -> Rect {
+        let mut scene = Experience::MeshOrb;
+        let mut viewport = Rect::NOTHING;
+        let mut output = context.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, size)),
+                ..Default::default()
+            },
+            |root| viewport = draw(root, &mut scene, 0.0, sim).logic_viewport.unwrap(),
+        );
+        output.textures_delta.clear();
+        viewport
+    }
+    #[test]
+    fn hiding_controls_returns_scene_width_and_resize_keeps_valid_viewport() {
+        let context = egui::Context::default();
+        let mut sim = Simulation::default();
+        let with = frame(&context, &mut sim, Vec2::new(1000.0, 800.0));
+        sim.controls = false;
+        let without = frame(&context, &mut sim, Vec2::new(1000.0, 800.0));
+        assert!(without.width() > with.width() + 200.0);
+        for size in [
+            Vec2::new(320.0, 240.0),
+            Vec2::new(1200.0, 200.0),
+            Vec2::new(500.0, 1000.0),
+        ] {
+            let rect = frame(&context, &mut sim, size);
+            assert!(rect.is_finite());
+            assert!(rect.width() > 0.0 && rect.height() > 0.0);
+        }
     }
 }
