@@ -25,9 +25,9 @@ impl Glyph {
     pub fn color(self) -> [f32; 3] {
         match self {
             Self::Coordinator => [1.0, 0.62, 0.12],
-            Self::Node => [0.25, 0.7, 1.0],
+            Self::Node => [0.85, 0.92, 1.0],
             Self::Session => [0.7, 0.32, 1.0],
-            Self::Workspace => [0.25, 0.5, 1.0],
+            Self::Workspace => [0.025, 0.22, 1.0],
             Self::Agent(state) => state.color(),
         }
     }
@@ -173,7 +173,7 @@ impl Geometry {
                 for i in 0..4 {
                     self.line(diamond[i], diamond[(i + 1) % 4], glyph.color(), alpha * 0.8);
                 }
-                self.dot(p, 1.3, [0.22, 0.35, 0.9], alpha * 0.6);
+                self.dot(p, 1.3, glyph.color(), alpha * 0.6);
             }
             Glyph::Agent(state) => {
                 let breathing = match state {
