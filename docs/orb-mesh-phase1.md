@@ -29,12 +29,12 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
 ## First-cut visual grammar
 
 - One gold coordinator, distinguished by its small orbiting crown.
-- Ice-blue workers moving on six fine 3D lattice orbits. Stable seeded locations
+- Ice-blue nodes moving on six fine 3D lattice orbits. Stable seeded locations
   avoid reshuffling existing objects as counts change; no real identities appear.
 - Violet session hubs on the inner particle globe, with concentric dot halos.
-  Workers own stable surface territories selected progressively from equal-area
+  Nodes own stable surface territories selected progressively from equal-area
   Fibonacci candidates, filling the largest remaining angular gaps. Clusters
-  rotate with the globe independently of satellite orbits; adding/removing workers
+  rotate with the globe independently of satellite orbits; adding/removing nodes
   preserves existing territories and scoped entity placement.
 - Indigo diamond workspace hubs arranged around each session, with full rings
   of agent dots around them. Successive child slots fill opposite sides and gaps
@@ -43,9 +43,9 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
   faint spokes connect agents to their workspace. Cyan agents work/breathe, amber
   agents are blocked, green agents are completed. Agent cores are crisp with
   compact halos, and the decorative field is dimmed for semantic contrast.
-- Fine connections from session clusters to their worker, then curved paths
-  from workers to the coordinator. Three-second colored ripples/pulses travel
-  from a changed leaf through its session/worker to the gold root.
+- Fine connections from session clusters to their node, then curved paths
+  from nodes to the coordinator. Three-second colored ripples/pulses travel
+  from a changed leaf through its session/node to the gold root.
 - Additive core/halo particles use the source Orbital Sphere WGSL renderer.
   Dimmer source particles supply the ambient geometric sphere pattern. Rear
   clusters, pulses and connections fade smoothly in brightness, with weaker halos
@@ -54,24 +54,31 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
   Depth changes preserve status hues and feather across the middle of the globe.
   The original Orbital Sphere retains its original glow and pixel-size behavior.
 - An enlarged visual key uses the sphere's own glyph geometry and linear colors:
-  gold core with dotted crown and root ring, glowing ice-blue worker, violet
+  gold core with dotted crown and root ring, glowing ice-blue node, violet
   session core with dotted halo, hollow workspace diamond with faint center,
   and compact agent glows. Working/needs-input samples share the scene's fast/slow
   breathing; completed stays steady. Samples face forward for recognition, with
   magnified details and HUD radial meshes approximating the WGSL core/halo profile.
   The key stays visible in the scene when the lab panel is
   hidden. Hierarchy and agent states occupy separate rows that wrap on narrow
-  windows. Event cards leave room for the key and footer; very short viewports
+  windows. Hierarchy order is Coordinator → Node → Session → Workspace → Agent,
+  with a bracket from Agent to Working / Needs input / Completed. Nodes are the
+  orbiting ice-blue satellites; agents are the smaller state-colored dots around
+  each workspace diamond. Event cards leave room for the key and footer; very short viewports
   suppress cards when there is insufficient room.
-- Anonymous callouts track a projected 3D anchor with elbow leaders, corner
+- Event callouts track a projected 3D anchor with elbow leaders, corner
   brackets, a typewriter heading, scan line, entrance easing and fade out.
-  Cards drift as flat screen-facing overlays; perspective 3D cards and richer
-  typography/callout collision handling are visual iteration opportunities.
+  Cards drift as flat screen-facing overlays and grow to fit wrapped text. They
+  stack independently along the two edges (one column in narrow views); only
+  cards that fit above the key are shown. Attention cards show node, session,
+  workspace and agent names on separate lines, using stable scoped synthetic
+  names in phase 1. Names are captured with the event. Perspective 3D cards and
+  richer typography remain visual iteration opportunities.
 
 ## Debug controls
 
-Per-worker/session/workspace controls set up to 24 workers, four sessions per
-worker, eight workspaces per session and 16 agents per workspace. Working and
+Per-node/session/workspace controls set up to 24 nodes, four sessions per
+node, eight workspaces per session and 16 agents per workspace. Working and
 blocked percentages seed the agent distribution; the rest are completed.
 Optional simulated events then change individual agent states, so the displayed
 counts can diverge from the seeded percentages. Turning simulation off freezes
@@ -84,16 +91,16 @@ clock, including fades, callouts and pulses. Manual controls can still change
 state while paused, and the transitions continue on resume.
 
 Quiet, Busy, Blocked, Dense and Empty presets exercise common visual scenarios.
-Zero workers leaves only the coordinator and ambient lattice. Zero sessions,
+Zero nodes leaves only the coordinator and ambient lattice. Zero sessions,
 workspaces or agents produces a valid truncated hierarchy. Arrival/departure and
 state changes generate callouts; the rolling queue is capped at three and
-expires after six seconds. One pulse per worker is retained, and removal of its
+expires after six seconds. One pulse per node is retained, and removal of its
 source cancels the pulse. Multiple blocked agents remain amber simultaneously,
 and the blocked total includes every one of them. "Needs input" in the key is
 this prototype's blocked state. Callout expiration does not resolve an agent;
-a fourth event replaces the oldest card, and a newer event on the same worker
+a fourth event replaces the oldest card, and a newer event on the same node
 replaces its pulse. There is no persistent per-agent input notification queue
-or input interaction yet. The coordinator is separate from all worker counts.
+or input interaction yet. The coordinator is separate from all node counts.
 
 ## Structure and checks
 
@@ -138,7 +145,7 @@ workspace and session layers before phase 2 integration.
 
 Twelve tests, formatting, strict all-target clippy and the optimized Linux build
 passed after the territory/depth changes. Tests verify both-side coverage and
-angular separation for increasing worker counts, preserved existing anchors,
+angular separation for increasing node counts, preserved existing anchors,
 independence of surface placement from satellite motion, and existing maximum
 geometry/viewport bounds. The revised renderer and its rear/shell/front pipelines
 were inspected in a native GPU window; the capture above reflects this iteration.
@@ -167,7 +174,7 @@ clippy and the optimized Linux build passed. New checks exercise key layout at
 narrow/wide/short sizes and verify every label is rendered with both the lab and
 callouts disabled. Native Linux rendering was inspected and the capture updated.
 Windows/macOS native acceptance remains open. Simultaneous blocked-agent state,
-the three-event/six-second callout window and per-worker pulse behavior are
+the three-event/six-second callout window and per-node pulse behavior are
 unchanged; this iteration adds no input notification queue or Herdr integration.
 
 
@@ -183,3 +190,23 @@ and hidden-lab checks. Fifteen tests, strict clippy, formatting and the optimize
 Linux build passed; the native GPU view was inspected and the capture refreshed.
 The HUD approximates glow shading with additive radial meshes rather than a
 second 3D viewport. Windows/macOS native graphical acceptance remains open.
+
+
+## Node/agent terminology and named attention (2026-10-06)
+
+Renamed the previous "Worker" presentation to "Node" in the key, lab and counts.
+The hierarchy key is Coordinator → Node → Session → Workspace → Agent; a bracket
+connects Agent to its three state samples and remains connected across wrapping.
+Nodes and agents retain distinct scene forms and existing synthetic ownership.
+Attention callouts now include node/session/workspace/agent names, such as
+`node-06`, `session-02`, `workspace-03`, `agent-02`. These are generated synthetic
+names, scoped by the full path; real daemon names require phase 2 integration.
+Cards measure heading/body height, wrap text and stack without overlap above the
+key. The event queue remains capped at three and expires after six seconds; only
+the newest cards fitting the available space are rendered.
+
+Seventeen tests, format, strict clippy and the optimized Linux build passed.
+New checks verify the complete event identity, retention across topology changes,
+and placement of variable-height cards in wide/narrow windows. Native rendering
+and the refreshed capture were inspected; Windows/macOS native acceptance remains
+open.

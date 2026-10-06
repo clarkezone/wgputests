@@ -224,13 +224,13 @@ impl Simulation {
         let (title, text, color) = if settings.nodes > old.nodes {
             (
                 "MESH EXPANDING",
-                format!("{} worker satellites joined", settings.nodes - old.nodes),
+                format!("{} mesh nodes joined", settings.nodes - old.nodes),
                 [0.2, 0.9, 1.0],
             )
         } else if settings.nodes < old.nodes {
             (
                 "MESH CONTRACTING",
-                format!("{} worker satellites departing", old.nodes - settings.nodes),
+                format!("{} mesh nodes departing", old.nodes - settings.nodes),
                 [1.0, 0.45, 0.15],
             )
         } else if states_changed {
@@ -246,7 +246,7 @@ impl Simulation {
                 [0.65, 0.4, 1.0],
             )
         };
-        // A departure callout remains anchored to a fading departing worker.
+        // A departure callout remains anchored to a fading departing node.
         let origin = if old.nodes > settings.nodes {
             Id::Node(settings.nodes)
         } else {
@@ -299,7 +299,7 @@ impl Simulation {
         if self.settings.nodes == 0 {
             return;
         }
-        // Cycle workers; select a valid leaf when the topology has one.
+        // Cycle nodes; select a valid leaf when the topology has one.
         let n = self.sequence % self.settings.nodes;
         let s = self.sequence % self.settings.sessions.max(1);
         let w = (self.sequence / 2) % self.settings.workspaces.max(1);
@@ -330,12 +330,22 @@ impl Simulation {
         let (title, text) = match state {
             AgentState::Working => (
                 "WORK RESUMED",
-                "Leaf activity propagating to the coordinator",
+                "Leaf activity propagating to the coordinator".into(),
             ),
-            AgentState::Blocked => ("ATTENTION REQUIRED", "An agent is awaiting input"),
-            AgentState::Completed => ("TASK COMPLETED", "A unit of work has finished"),
+            // Names are stable scoped synthetic identities until live integration.
+            AgentState::Blocked => (
+                "ATTENTION REQUIRED",
+                format!(
+                    "Awaiting input\nNode: node-{:02}\nSession: session-{:02}\nWorkspace: workspace-{:02}\nAgent: agent-{:02}",
+                    n + 1,
+                    s + 1,
+                    w + 1,
+                    a + 1
+                ),
+            ),
+            AgentState::Completed => ("TASK COMPLETED", "A unit of work has finished".into()),
         };
-        self.event(id, title, text.into(), state.color());
+        self.event(id, title, text, state.color());
     }
     fn event(&mut self, origin: Id, title: &'static str, text: String, color: [f32; 3]) {
         if self.events.len() >= 3 {
@@ -354,6 +364,36 @@ impl Simulation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn attention_event_identifies_every_level_of_the_origin() {
+        let mut sim = Simulation::default();
+        sim.configure(Settings {
+            working: 100,
+            blocked: 0,
+            ..sim.settings
+        });
+        sim.sequence = 5;
+        sim.trigger();
+        let event = sim.events.back().unwrap();
+        assert_eq!(event.origin, Id::Agent(5, 1, 2, 1));
+        assert_eq!(event.title, "ATTENTION REQUIRED");
+        for name in [
+            "Node: node-06",
+            "Session: session-02",
+            "Workspace: workspace-03",
+            "Agent: agent-02",
+        ] {
+            assert!(event.text.contains(name));
+        }
+        // Subsequent topology changes do not alter this event's captured identity.
+        let text = event.text.clone();
+        sim.configure(Settings {
+            nodes: 1,
+            ..sim.settings
+        });
+        assert!(sim.events.iter().any(|event| event.text == text));
+    }
+
     fn tick(sim: &mut Simulation, seconds: f32) {
         for _ in 0..(seconds * 20.0) as usize {
             sim.advance(0.05);

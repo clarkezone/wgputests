@@ -15,14 +15,16 @@ impl Entry {
     }
 }
 
-pub const ENTRIES: [Entry; 7] = [
+const HIERARCHY_COUNT: usize = 5;
+
+pub const ENTRIES: [Entry; 8] = [
     Entry {
         label: "Coordinator",
         glyph: Glyph::Coordinator,
     },
     Entry {
-        label: "Worker",
-        glyph: Glyph::Worker,
+        label: "Node",
+        glyph: Glyph::Node,
     },
     Entry {
         label: "Session",
@@ -31,6 +33,10 @@ pub const ENTRIES: [Entry; 7] = [
     Entry {
         label: "Workspace",
         glyph: Glyph::Workspace,
+    },
+    Entry {
+        label: "Agent",
+        glyph: Glyph::Agent(AgentState::Working),
     },
     Entry {
         label: "Working",
@@ -59,7 +65,7 @@ pub fn layout(painter: &Painter, viewport: Rect) -> Layout {
     let icon_width = if inner_width >= 360.0 && viewport.height() >= 280.0 {
         48.0
     } else {
-        36.0
+        32.0
     };
     let row_height = icon_width - 4.0;
     let mut cells = Vec::with_capacity(ENTRIES.len());
@@ -68,9 +74,12 @@ pub fn layout(painter: &Painter, viewport: Rect) -> Layout {
         let text =
             painter.layout_no_wrap(entry.label.into(), FontId::monospace(10.0), entry.color());
         let cell_width = (text.size().x + icon_width + 6.0).min(inner_width);
-        if i == 4 || (x > 0.0 && x + cell_width > inner_width) {
-            x = 0.0;
-            y += row_height + 4.0;
+        if i == HIERARCHY_COUNT {
+            x = 14.0;
+            y += row_height + 16.0;
+        } else if x > 0.0 && x + cell_width > inner_width {
+            x = if i > HIERARCHY_COUNT { 14.0 } else { 0.0 };
+            y += row_height + if i > HIERARCHY_COUNT { 12.0 } else { 4.0 };
         }
         cells.push(Rect::from_min_size(
             pos2(x, y),
@@ -181,6 +190,45 @@ pub fn draw(painter: &Painter, layout: &Layout, time: f32) {
         Stroke::new(0.5, Color32::from_white_alpha(35)),
         egui::StrokeKind::Inside,
     );
+    for pair in layout.cells[..HIERARCHY_COUNT].windows(2) {
+        if pair[0].top() == pair[1].top() {
+            let center = pos2(pair[0].right() + 5.0, pair[0].center().y);
+            painter.add(egui::Shape::line(
+                vec![
+                    center + vec2(-1.5, -2.5),
+                    center + vec2(1.5, 0.0),
+                    center + vec2(-1.5, 2.5),
+                ],
+                Stroke::new(0.8, Color32::from_gray(110)),
+            ));
+        }
+    }
+    // Link Agent to every state, routing through the left gutter when rows wrap.
+    let parent = layout.cells[HIERARCHY_COUNT - 1];
+    let states = &layout.cells[HIERARCHY_COUNT..];
+    let rail_x = bounds.left() + 12.0;
+    let root = pos2(parent.left() + layout.icon_width * 0.5, parent.bottom());
+    let joint_y = states[0].top() - 8.0;
+    let stroke = Stroke::new(1.0, Color32::from_rgba_unmultiplied(105, 178, 203, 180));
+    painter.add(egui::Shape::line(
+        vec![root, pos2(root.x, joint_y), pos2(rail_x, joint_y)],
+        stroke,
+    ));
+    painter.line_segment(
+        [
+            pos2(rail_x, joint_y),
+            pos2(rail_x, states.last().unwrap().top() - 8.0),
+        ],
+        stroke,
+    );
+    for state in states {
+        let x = state.left() + layout.icon_width * 0.5;
+        let y = state.top() - 8.0;
+        painter.add(egui::Shape::line(
+            vec![pos2(rail_x, y), pos2(x, y), pos2(x, state.top() + 6.0)],
+            stroke,
+        ));
+    }
     for (entry, cell) in ENTRIES.iter().zip(&layout.cells) {
         sample(
             painter,
@@ -233,7 +281,7 @@ mod tests {
                             assert!(!cell.intersects(*other));
                         }
                     }
-                    assert!(cells[4].top() > cells[3].top());
+                    assert!(cells[HIERARCHY_COUNT].top() > cells[HIERARCHY_COUNT - 1].top());
                     draw(ui.painter(), &key, 0.0);
                 },
             );

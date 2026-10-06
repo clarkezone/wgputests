@@ -1,4 +1,4 @@
-//! 3D constellation geometry and projected, anonymous movie-style callouts.
+//! 3D constellation geometry and projected movie-style callouts.
 use crate::logic_core::Viewport;
 use crate::mesh_model::{AgentState, Id, PULSE_DURATION, Simulation, ease, noise};
 use crate::orbital_sphere::{LineVertex, Particle};
@@ -16,7 +16,7 @@ pub struct Geometry {
 #[derive(Clone, Copy)]
 pub enum Glyph {
     Coordinator,
-    Worker,
+    Node,
     Session,
     Workspace,
     Agent(AgentState),
@@ -25,7 +25,7 @@ impl Glyph {
     pub fn color(self) -> [f32; 3] {
         match self {
             Self::Coordinator => [1.0, 0.62, 0.12],
-            Self::Worker => [0.25, 0.7, 1.0],
+            Self::Node => [0.25, 0.7, 1.0],
             Self::Session => [0.7, 0.32, 1.0],
             Self::Workspace => [0.25, 0.5, 1.0],
             Self::Agent(state) => state.color(),
@@ -155,7 +155,7 @@ impl Geometry {
                     );
                 }
             }
-            Glyph::Worker => self.dot(p, 5.5, glyph.color(), alpha),
+            Glyph::Node => self.dot(p, 5.5, glyph.color(), alpha),
             Glyph::Session => {
                 self.dot(p, 4.4, glyph.color(), alpha);
                 for i in 0..24 {
@@ -266,7 +266,7 @@ pub fn geometry(sim: &Simulation) -> Geometry {
         let p = visible_position(sim, id);
         match id {
             Id::Node(_) => {
-                g.glyph(Glyph::Worker, p, alpha, time, 0.0);
+                g.glyph(Glyph::Node, p, alpha, time, 0.0);
                 g.curve(p, root, [0.3, 0.13, 0.7], alpha * 0.28, 0.5);
             }
             Id::Session(n, _) => {
@@ -307,7 +307,7 @@ pub fn geometry(sim: &Simulation) -> Geometry {
         let start = visible_position(sim, pulse.origin);
         let session = visible_position(sim, Id::Session(n, s));
         let node = visible_position(sim, Id::Node(n));
-        // Leaf -> workspace -> session ripple, then session -> worker -> coordinator.
+        // Leaf -> workspace -> session ripple, then session -> node -> coordinator.
         let first_end = if matches!(pulse.origin, Id::Node(..)) {
             node
         } else {
@@ -375,6 +375,34 @@ fn project(pos: Vec3, time: f32, rect: egui::Rect) -> Option<egui::Pos2> {
         rect.center().y - p.y * rect.height() * 0.5,
     ))
 }
+// Grow cards to their text and stack independently in the two edge columns.
+// The reserved margin also contains their +/-9 px animated drift.
+fn callout_rect(
+    rect: egui::Rect,
+    bottom: f32,
+    next_y: &mut [f32; 2],
+    prefer_left: bool,
+    height: f32,
+) -> Option<(egui::Rect, bool)> {
+    let width = 240.0_f32.min(rect.width() * 0.38).max(120.0);
+    let left = prefer_left && rect.width() >= width * 2.0 + 48.0;
+    let column = usize::from(left);
+    let y = next_y[column];
+    if y + height > bottom {
+        return None;
+    }
+    next_y[column] += height + 28.0;
+    let x = if left {
+        rect.left() + 18.0
+    } else {
+        rect.right() - width - 18.0
+    };
+    Some((
+        egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(width, height)),
+        left,
+    ))
+}
+
 pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
     let painter = ui.painter().with_clip_rect(rect);
     let cyan = egui::Color32::from_rgb(90, 216, 235);
@@ -390,7 +418,7 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
         rect.left_bottom() + egui::vec2(20.0, -18.0),
         egui::Align2::LEFT_BOTTOM,
         format!(
-            "{} SATELLITES   /   {} ACTIVE   /   {} BLOCKED   /   {} COMPLETE",
+            "{} NODES   /   {} ACTIVE   /   {} BLOCKED   /   {} COMPLETE",
             sim.settings.nodes, c[0], c[1], c[2]
         ),
         egui::FontId::monospace(11.0),
@@ -407,8 +435,8 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
     // Leave the key and footer readable even while event cards drift.
     let cards_top = rect.top() + 55.0;
     let cards_bottom = legend.bounds.top() - 20.0;
-    let travel = cards_bottom - cards_top - 84.0;
-    if !sim.callouts || rect.width() < 260.0 || travel < 18.0 {
+    let mut next_y = [cards_top; 2];
+    if !sim.callouts || rect.width() < 260.0 || cards_bottom - cards_top < 84.0 {
         crate::mesh_legend::draw(&painter, &legend, sim.time);
         return;
     }
@@ -425,18 +453,29 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
         let anchor =
             project(visible_position(sim, event.origin), sim.time, rect).unwrap_or(rect.center());
         let width = 240.0_f32.min(rect.width() * 0.38).max(120.0);
-        // HUD cards drift gently at the edges while their leaders track real 3D anchors.
-        let x = if slot == 1 {
-            rect.left() + 18.0
-        } else {
-            rect.right() - width - 18.0
-        };
-        let y =
-            cards_top + slot as f32 * travel / 2.0 + (sim.time * 0.24 + slot as f32).sin() * 9.0;
-        let card = egui::Rect::from_min_size(
-            egui::pos2(x + (1.0 - reveal) * 22.0, y),
-            egui::vec2(width, 84.0),
+        let header = painter.layout(
+            event.title.into(),
+            egui::FontId::monospace(11.0),
+            col,
+            width - 24.0,
         );
+        let galley = painter.layout(
+            event.text.clone(),
+            egui::FontId::monospace(10.0),
+            col.gamma_multiply(0.8),
+            width - 24.0,
+        );
+        let body_top = 12.0 + header.size().y + 10.0;
+        let height = (body_top + galley.size().y + 24.0).max(84.0);
+        let Some((card, left)) = callout_rect(rect, cards_bottom, &mut next_y, slot == 1, height)
+        else {
+            continue;
+        };
+        // HUD cards drift gently at the edges while their leaders track real 3D anchors.
+        let card = card.translate(egui::vec2(
+            (1.0 - reveal) * 22.0,
+            (sim.time * 0.24 + slot as f32).sin() * 9.0,
+        ));
         painter.rect_filled(
             card,
             0.0,
@@ -462,7 +501,7 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
         ] {
             painter.line_segment([a, b], egui::Stroke::new(1.5, col));
         }
-        let end = if slot == 1 {
+        let end = if left {
             card.right_center()
         } else {
             card.left_center()
@@ -482,20 +521,9 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
             .chars()
             .take((age * 36.0) as usize)
             .collect::<String>();
-        painter.text(
-            card.left_top() + egui::vec2(12.0, 12.0),
-            egui::Align2::LEFT_TOP,
-            text,
-            egui::FontId::monospace(11.0),
-            col,
-        );
-        let galley = painter.layout(
-            event.text.clone(),
-            egui::FontId::monospace(10.0),
-            col.gamma_multiply(0.8),
-            width - 24.0,
-        );
-        painter.galley(card.left_top() + egui::vec2(12.0, 32.0), galley, col);
+        let heading = painter.layout(text, egui::FontId::monospace(11.0), col, width - 24.0);
+        painter.galley(card.left_top() + egui::vec2(12.0, 12.0), heading, col);
+        painter.galley(card.left_top() + egui::vec2(12.0, body_top), galley, col);
         painter.line_segment(
             [
                 card.left_bottom() + egui::vec2(12.0, -10.0),
@@ -512,6 +540,27 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
 mod tests {
     use super::*;
     use crate::mesh_model::{MAX_AGENTS, MAX_NODES, MAX_SESSIONS, MAX_WORKSPACES, Settings};
+    #[test]
+    fn expanded_callouts_stack_without_overlapping_and_respect_the_key() {
+        let viewport = egui::Rect::from_min_size(egui::pos2(30.0, 40.0), egui::vec2(650.0, 460.0));
+        let bottom = 325.0;
+        let mut next_y = [95.0; 2];
+        let (first, _) = callout_rect(viewport, bottom, &mut next_y, false, 120.0).unwrap();
+        let (second, _) = callout_rect(viewport, bottom, &mut next_y, true, 120.0).unwrap();
+        assert!(!first.intersects(second));
+        assert!(callout_rect(viewport, bottom, &mut next_y, false, 120.0).is_none());
+        for rect in [first, second] {
+            assert!(viewport.contains_rect(rect));
+            assert!(rect.bottom() + 9.0 < bottom + 20.0);
+        }
+        let narrow = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(280.0, 600.0));
+        let mut next_y = [55.0; 2];
+        let (first, _) = callout_rect(narrow, 550.0, &mut next_y, false, 150.0).unwrap();
+        let (second, left) = callout_rect(narrow, 550.0, &mut next_y, true, 150.0).unwrap();
+        assert!(!left);
+        assert!(!first.intersects(second));
+    }
+
     #[test]
     fn small_agent_rings_are_distributed_and_readable_in_the_default_view() {
         let workspace = position(Id::Workspace(0, 0, 0), 0.0);
@@ -572,7 +621,7 @@ mod tests {
     fn placement_stays_stable_as_counts_change_and_projects_resize() {
         let id = Id::Agent(2, 1, 2, 3);
         let p = position(id, 2.0);
-        // Surface placement does not follow a worker's changing orbital angle.
+        // Surface placement does not follow a node's changing orbital angle.
         assert_eq!(p, position(id, 120.0));
         assert_ne!(position(Id::Node(2), 2.0), position(Id::Node(2), 120.0));
         let mut sim = Simulation::default();

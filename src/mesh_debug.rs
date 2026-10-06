@@ -18,8 +18,8 @@ pub fn draw(root: &mut egui::Ui, sim: &mut Simulation) {
                 ui.label("Phase 1 · synthetic data"); ui.separator();
                 let mut s=sim.settings;
                 ui.label("Topology");
-                ui.add(egui::Slider::new(&mut s.nodes,0..=MAX_NODES).text("workers"));
-                ui.add(egui::Slider::new(&mut s.sessions,0..=MAX_SESSIONS).text("sessions / worker"));
+                ui.add(egui::Slider::new(&mut s.nodes,0..=MAX_NODES).text("nodes"));
+                ui.add(egui::Slider::new(&mut s.sessions,0..=MAX_SESSIONS).text("sessions / node"));
                 ui.add(egui::Slider::new(&mut s.workspaces,0..=MAX_WORKSPACES).text("spaces / session"));
                 ui.add(egui::Slider::new(&mut s.agents,0..=MAX_AGENTS).text("agents / space"));
                 ui.separator(); ui.label("Agent distribution");
@@ -53,7 +53,7 @@ pub fn draw(root: &mut egui::Ui, sim: &mut Simulation) {
                         ui.colored_label(entry.color(), entry.label);
                     });
                 }
-                ui.separator(); ui.small("H hides this panel. Space pauses. P triggers activity.\nCounts reshape the scene over 1.2 s; pulses travel leaf → session → worker → coordinator in 3 s.");
+                ui.separator(); ui.small("H hides this panel. Space pauses. P triggers activity.\nCounts reshape the scene over 1.2 s; pulses travel leaf → session → node → coordinator in 3 s.");
             });
         });
 }
