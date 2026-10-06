@@ -1,6 +1,7 @@
 mod cube;
 mod logic_core;
 mod mesh_debug;
+mod mesh_legend;
 mod mesh_model;
 mod mesh_orb;
 mod mesh_territory;

@@ -183,4 +183,41 @@ mod tests {
             assert!(rect.width() > 0.0 && rect.height() > 0.0);
         }
     }
+
+    #[test]
+    fn scene_key_is_painted_with_the_lab_hidden_and_callouts_disabled() {
+        fn contains_text(shape: &egui::Shape, label: &str) -> bool {
+            match shape {
+                egui::Shape::Text(text) => text.galley.text() == label,
+                egui::Shape::Vec(shapes) => shapes.iter().any(|s| contains_text(s, label)),
+                _ => false,
+            }
+        }
+        let context = egui::Context::default();
+        let mut sim = Simulation::default();
+        sim.controls = false;
+        sim.callouts = false;
+        let mut scene = Experience::MeshOrb;
+        let mut output = context.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    Vec2::new(650.0, 460.0),
+                )),
+                ..Default::default()
+            },
+            |root| {
+                draw(root, &mut scene, 0.0, &mut sim);
+            },
+        );
+        for entry in &crate::mesh_legend::ENTRIES {
+            assert!(
+                output
+                    .shapes
+                    .iter()
+                    .any(|s| contains_text(&s.shape, entry.label))
+            );
+        }
+        output.textures_delta.clear();
+    }
 }

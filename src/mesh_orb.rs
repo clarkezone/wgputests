@@ -365,7 +365,13 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
             egui::Stroke::new(1.0, egui::Color32::from_rgb(242, 177, 70)),
         );
     }
-    if !sim.callouts || rect.width() < 260.0 || rect.height() < 200.0 {
+    let legend = crate::mesh_legend::layout(&painter, rect);
+    // Leave the key and footer readable even while event cards drift.
+    let cards_top = rect.top() + 55.0;
+    let cards_bottom = legend.bounds.top() - 20.0;
+    let travel = cards_bottom - cards_top - 84.0;
+    if !sim.callouts || rect.width() < 260.0 || travel < 18.0 {
+        crate::mesh_legend::draw(&painter, &legend);
         return;
     }
     for (slot, event) in sim.events.iter().rev().enumerate() {
@@ -387,10 +393,8 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
         } else {
             rect.right() - width - 18.0
         };
-        let y = rect.top()
-            + 55.0
-            + slot as f32 * (rect.height() - 150.0).max(0.0) / 3.0
-            + (sim.time * 0.24 + slot as f32).sin() * 9.0;
+        let y =
+            cards_top + slot as f32 * travel / 2.0 + (sim.time * 0.24 + slot as f32).sin() * 9.0;
         let card = egui::Rect::from_min_size(
             egui::pos2(x + (1.0 - reveal) * 22.0, y),
             egui::vec2(width, 84.0),
@@ -462,6 +466,8 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
             egui::Stroke::new(1.0, col),
         );
     }
+    // Paint last so moving leader lines cannot obscure the key.
+    crate::mesh_legend::draw(&painter, &legend);
 }
 
 #[cfg(test)]

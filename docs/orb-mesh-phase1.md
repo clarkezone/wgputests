@@ -53,6 +53,10 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
   between rear and front layers; rear clusters remain visible through the globe.
   Depth changes preserve status hues and feather across the middle of the globe.
   The original Orbital Sphere retains its original glow and pixel-size behavior.
+- A compact color/shape key stays visible in the scene when the lab panel is
+  hidden. Hierarchy and agent states occupy separate rows that wrap on narrow
+  windows. Event cards leave room for the key and footer; very short viewports
+  suppress cards when there is insufficient room.
 - Anonymous callouts track a projected 3D anchor with elbow leaders, corner
   brackets, a typewriter heading, scan line, entrance easing and fade out.
   Cards drift as flat screen-facing overlays; perspective 3D cards and richer
@@ -78,7 +82,12 @@ Zero workers leaves only the coordinator and ambient lattice. Zero sessions,
 workspaces or agents produces a valid truncated hierarchy. Arrival/departure and
 state changes generate callouts; the rolling queue is capped at three and
 expires after six seconds. One pulse per worker is retained, and removal of its
-source cancels the pulse. The coordinator is separate from all worker counts.
+source cancels the pulse. Multiple blocked agents remain amber simultaneously,
+and the blocked total includes every one of them. "Needs input" in the key is
+this prototype's blocked state. Callout expiration does not resolve an agent;
+a fourth event replaces the oldest card, and a newer event on the same worker
+replaces its pulse. There is no persistent per-agent input notification queue
+or input interaction yet. The coordinator is separate from all worker counts.
 
 ## Structure and checks
 
@@ -88,6 +97,7 @@ source cancels the pulse. The coordinator is separate from all worker counts.
 - `mesh_orb.rs`: pure geometry, 3D hierarchy paths, pulse stages, camera and
   projected callouts.
 - `mesh_debug.rs`: control panel bound to the model.
+- `mesh_legend.rs`: shared color/shape key and responsive scene overlay.
 - `orbital_sphere.rs` / `.wgsl`: shared instanced GPU particles and colored lines.
 
 ```sh
@@ -140,3 +150,16 @@ agent separation in the default view. Format/clippy and the optimized Linux
 build passed; the refreshed native capture illustrates the iteration. Dense
 scenes and clusters viewed edge-on can still overlap in projection; this does not
 claim per-agent legibility for maximum synthetic counts in a small window.
+
+
+## Scene color key (2026-10-06)
+
+Added a persistent two-group hierarchy/state key, shared with the lab panel.
+The scene key wraps to fit narrow windows and is painted above moving leaders;
+event cards reserve its footer area. Fifteen tests, formatting, strict all-target
+clippy and the optimized Linux build passed. New checks exercise key layout at
+narrow/wide/short sizes and verify every label is rendered with both the lab and
+callouts disabled. Native Linux rendering was inspected and the capture updated.
+Windows/macOS native acceptance remains open. Simultaneous blocked-agent state,
+the three-event/six-second callout window and per-worker pulse behavior are
+unchanged; this iteration adds no input notification queue or Herdr integration.
