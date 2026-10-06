@@ -210,6 +210,23 @@ mod tests {
                 draw(root, &mut scene, 0.0, &mut sim);
             },
         );
+        let totals = sim.summary();
+        for label in [
+            format!("{} NODES", totals.nodes),
+            format!("{} SESSIONS", totals.sessions),
+            format!("{} WORKSPACES", totals.workspaces),
+            format!("{} AGENTS", totals.agents),
+            format!("{} WORKING", totals.states[0]),
+            format!("{} BLOCKED", totals.states[1]),
+            format!("{} COMPLETE", totals.states[2]),
+        ] {
+            assert!(
+                output
+                    .shapes
+                    .iter()
+                    .any(|s| contains_text(&s.shape, &label))
+            );
+        }
         for entry in &crate::mesh_legend::ENTRIES {
             assert!(
                 output

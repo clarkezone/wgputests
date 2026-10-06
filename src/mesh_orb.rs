@@ -415,17 +415,7 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
         egui::FontId::monospace(12.0),
         cyan,
     );
-    let c = sim.counts();
-    painter.text(
-        rect.left_bottom() + egui::vec2(20.0, -18.0),
-        egui::Align2::LEFT_BOTTOM,
-        format!(
-            "{} NODES   /   {} ACTIVE   /   {} BLOCKED   /   {} COMPLETE",
-            sim.settings.nodes, c[0], c[1], c[2]
-        ),
-        egui::FontId::monospace(11.0),
-        cyan,
-    );
+    let stats = crate::mesh_stats::layout(&painter, rect, sim.summary());
     if let Some(anchor) = project(coordinator(sim.time), sim.time, rect) {
         painter.circle_stroke(
             anchor,
@@ -433,13 +423,14 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
             egui::Stroke::new(1.0, egui::Color32::from_rgb(242, 177, 70)),
         );
     }
-    let legend = crate::mesh_legend::layout(&painter, rect);
+    let legend = crate::mesh_legend::layout(&painter, rect, stats.bounds.top() - 10.0);
     // Leave the key and footer readable even while event cards drift.
     let cards_top = rect.top() + 55.0;
     let cards_bottom = legend.bounds.top() - 20.0;
     let mut next_y = [cards_top; 2];
     if !sim.callouts || rect.width() < 260.0 || cards_bottom - cards_top < 84.0 {
         crate::mesh_legend::draw(&painter, &legend, sim.time);
+        crate::mesh_stats::draw(&painter, &stats);
         return;
     }
     for event in sim.events.iter().rev() {
@@ -541,6 +532,7 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
     }
     // Paint last so moving leader lines cannot obscure the key.
     crate::mesh_legend::draw(&painter, &legend, sim.time);
+    crate::mesh_stats::draw(&painter, &stats);
 }
 
 #[cfg(test)]

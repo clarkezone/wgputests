@@ -70,6 +70,15 @@ impl Settings {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Summary {
+    pub nodes: usize,
+    pub sessions: usize,
+    pub workspaces: usize,
+    pub agents: usize,
+    pub states: [usize; 3],
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Id {
     Node(usize),
@@ -291,20 +300,29 @@ impl Simulation {
             }
         })
     }
-    pub fn counts(&self) -> [usize; 3] {
-        let mut c = [0; 3];
+    pub fn summary(&self) -> Summary {
+        let mut summary = Summary::default();
+        // Departing entities remain in the scene while fading, but not in totals.
         for id in self
             .entities
             .keys()
-            .filter(|id| matches!(id, Id::Agent(..)) && self.settings.contains(**id))
+            .filter(|id| self.settings.contains(**id))
         {
-            c[match self.state(*id) {
-                AgentState::Working => 0,
-                AgentState::Blocked => 1,
-                AgentState::Completed => 2,
-            }] += 1;
+            match id {
+                Id::Node(_) => summary.nodes += 1,
+                Id::Session(..) => summary.sessions += 1,
+                Id::Workspace(..) => summary.workspaces += 1,
+                Id::Agent(..) => {
+                    summary.agents += 1;
+                    summary.states[match self.state(*id) {
+                        AgentState::Working => 0,
+                        AgentState::Blocked => 1,
+                        AgentState::Completed => 2,
+                    }] += 1;
+                }
+            }
         }
-        c
+        summary
     }
     pub fn trigger(&mut self) {
         if self.settings.nodes == 0 {
@@ -460,16 +478,90 @@ mod tests {
             auto_activity: false,
             ..Default::default()
         };
-        assert_eq!(s.counts().iter().sum::<usize>(), 6 * 2 * 3 * 6);
+        assert_eq!(s.summary().states.iter().sum::<usize>(), 6 * 2 * 3 * 6);
         s.configure(Settings {
             nodes: 0,
             ..s.settings
         });
         tick(&mut s, 2.0);
         assert!(s.entities.is_empty());
-        assert_eq!(s.counts(), [0; 3]);
+        assert_eq!(s.summary(), Summary::default());
         s.trigger();
         assert!(s.pulses.is_empty());
+    }
+    #[test]
+    fn summary_tracks_current_membership_and_leaf_state_changes() {
+        let mut sim = Simulation {
+            auto_activity: false,
+            ..Default::default()
+        };
+        sim.configure(Settings {
+            nodes: 2,
+            sessions: 3,
+            workspaces: 2,
+            agents: 4,
+            working: 100,
+            blocked: 0,
+        });
+        let summary = sim.summary();
+        assert_eq!(
+            summary,
+            Summary {
+                nodes: 2,
+                sessions: 6,
+                workspaces: 12,
+                agents: 48,
+                states: [48, 0, 0],
+            }
+        );
+        sim.trigger();
+        assert_eq!(sim.summary().agents, 48);
+        assert_eq!(sim.summary().states, [47, 1, 0]);
+        // Truncate successive hierarchy levels, before departing entities fade out.
+        for (settings, expected) in [
+            (
+                Settings {
+                    agents: 0,
+                    ..sim.settings
+                },
+                [2, 6, 12, 0],
+            ),
+            (
+                Settings {
+                    workspaces: 0,
+                    ..sim.settings
+                },
+                [2, 6, 0, 0],
+            ),
+            (
+                Settings {
+                    sessions: 0,
+                    ..sim.settings
+                },
+                [2, 0, 0, 0],
+            ),
+            (
+                Settings {
+                    nodes: 0,
+                    ..sim.settings
+                },
+                [0, 0, 0, 0],
+            ),
+        ] {
+            sim.configure(settings);
+            let summary = sim.summary();
+            assert_eq!(
+                [
+                    summary.nodes,
+                    summary.sessions,
+                    summary.workspaces,
+                    summary.agents
+                ],
+                expected
+            );
+            assert_eq!(summary.states.iter().sum::<usize>(), summary.agents);
+            assert!(!sim.entities.is_empty());
+        }
     }
     #[test]
     fn reversal_preserves_current_opacity_and_identity() {
@@ -530,7 +622,7 @@ mod tests {
         });
         assert_eq!(s.settings.bounded(), s.settings);
         assert_eq!(
-            s.counts(),
+            s.summary().states,
             [MAX_NODES * MAX_SESSIONS * MAX_WORKSPACES * MAX_AGENTS, 0, 0]
         );
     }
