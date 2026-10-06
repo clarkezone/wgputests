@@ -47,12 +47,11 @@ pub fn draw(root: &mut egui::Ui, sim: &mut Simulation) {
                 let c=sim.counts();
                 ui.label(format!("{} sessions · {} workspaces\n{} agents",sim.settings.nodes*sim.settings.sessions,sim.settings.nodes*sim.settings.sessions*sim.settings.workspaces,c.iter().sum::<usize>()));
                 for entry in &crate::mesh_legend::ENTRIES {
-                    let marker = match entry.marker {
-                        crate::mesh_legend::Marker::Dot => "●",
-                        crate::mesh_legend::Marker::Ring => "◎",
-                        crate::mesh_legend::Marker::Diamond => "◇",
-                    };
-                    ui.colored_label(entry.color, format!("{marker} {}", entry.label));
+                    ui.horizontal(|ui| {
+                        let (rect, _) = ui.allocate_exact_size(egui::vec2(36.0, 32.0), egui::Sense::hover());
+                        crate::mesh_legend::sample(ui.painter(), entry.glyph, rect, sim.time);
+                        ui.colored_label(entry.color(), entry.label);
+                    });
                 }
                 ui.separator(); ui.small("H hides this panel. Space pauses. P triggers activity.\nCounts reshape the scene over 1.2 s; pulses travel leaf → session → worker → coordinator in 3 s.");
             });

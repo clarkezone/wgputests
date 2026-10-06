@@ -53,7 +53,13 @@ to cover Windows, macOS and Linux. There is no browser or external renderer.
   between rear and front layers; rear clusters remain visible through the globe.
   Depth changes preserve status hues and feather across the middle of the globe.
   The original Orbital Sphere retains its original glow and pixel-size behavior.
-- A compact color/shape key stays visible in the scene when the lab panel is
+- An enlarged visual key uses the sphere's own glyph geometry and linear colors:
+  gold core with dotted crown and root ring, glowing ice-blue worker, violet
+  session core with dotted halo, hollow workspace diamond with faint center,
+  and compact agent glows. Working/needs-input samples share the scene's fast/slow
+  breathing; completed stays steady. Samples face forward for recognition, with
+  magnified details and HUD radial meshes approximating the WGSL core/halo profile.
+  The key stays visible in the scene when the lab panel is
   hidden. Hierarchy and agent states occupy separate rows that wrap on narrow
   windows. Event cards leave room for the key and footer; very short viewports
   suppress cards when there is insufficient room.
@@ -163,3 +169,17 @@ callouts disabled. Native Linux rendering was inspected and the capture updated.
 Windows/macOS native acceptance remains open. Simultaneous blocked-agent state,
 the three-event/six-second callout window and per-worker pulse behavior are
 unchanged; this iteration adds no input notification queue or Herdr integration.
+
+
+## Visual key samples (2026-10-06)
+
+Replaced generic dots/rings with enlarged front-facing samples generated from the
+same glyph function used by the sphere. The lab also uses these samples. Shared
+geometry retains coordinator crown dots, session halo dots, workspace outlines
+and center glow, agent colors and breathing cadence. Key animations use the
+simulation clock, so playback pause freezes them alongside the scene. Preview
+sizes adapt to narrow/short viewports; label-fit assertions join existing layout
+and hidden-lab checks. Fifteen tests, strict clippy, formatting and the optimized
+Linux build passed; the native GPU view was inspected and the capture refreshed.
+The HUD approximates glow shading with additive radial meshes rather than a
+second 3D viewport. Windows/macOS native graphical acceptance remains open.

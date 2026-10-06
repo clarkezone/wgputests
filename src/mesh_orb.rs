@@ -12,6 +12,36 @@ pub struct Geometry {
     pub lines: Vec<LineVertex>,
 }
 
+/// Semantic forms shared by the live scene and its visual key.
+#[derive(Clone, Copy)]
+pub enum Glyph {
+    Coordinator,
+    Worker,
+    Session,
+    Workspace,
+    Agent(AgentState),
+}
+impl Glyph {
+    pub fn color(self) -> [f32; 3] {
+        match self {
+            Self::Coordinator => [1.0, 0.62, 0.12],
+            Self::Worker => [0.25, 0.7, 1.0],
+            Self::Session => [0.7, 0.32, 1.0],
+            Self::Workspace => [0.25, 0.5, 1.0],
+            Self::Agent(state) => state.color(),
+        }
+    }
+}
+
+pub fn glyph_geometry(glyph: Glyph, time: f32) -> Geometry {
+    let mut g = Geometry {
+        particles: Vec::new(),
+        lines: Vec::new(),
+    };
+    g.glyph(glyph, Vec3::Z, 1.0, time, 0.0);
+    g
+}
+
 pub fn camera_distance(viewport: Viewport) -> f32 {
     let aspect = viewport.width / viewport.height.max(1.0);
     let half = (45.0_f32.to_radians() * 0.5).tan();
@@ -112,6 +142,49 @@ fn arc(start: Vec3, end: Vec3, t: f32, bulge: f32) -> Vec3 {
     center + outward * (PI * t).sin() * bulge
 }
 impl Geometry {
+    fn glyph(&mut self, glyph: Glyph, p: Vec3, alpha: f32, time: f32, phase: f32) {
+        match glyph {
+            Glyph::Coordinator => {
+                self.dot(p, 7.0, glyph.color(), alpha);
+                for i in 0..32 {
+                    self.dot(
+                        circle(p, 0.085, i as f32 * TAU / 32.0 + time * 0.2),
+                        1.15,
+                        [1.0, 0.5, 0.08],
+                        alpha * 0.7,
+                    );
+                }
+            }
+            Glyph::Worker => self.dot(p, 5.5, glyph.color(), alpha),
+            Glyph::Session => {
+                self.dot(p, 4.4, glyph.color(), alpha);
+                for i in 0..24 {
+                    self.dot(
+                        circle(p, 0.16, i as f32 * TAU / 24.0),
+                        0.9,
+                        [0.5, 0.15, 0.9],
+                        alpha * 0.6,
+                    );
+                }
+            }
+            Glyph::Workspace => {
+                let diamond =
+                    std::array::from_fn::<_, 4, _>(|i| circle(p, 0.065, i as f32 * TAU / 4.0));
+                for i in 0..4 {
+                    self.line(diamond[i], diamond[(i + 1) % 4], glyph.color(), alpha * 0.8);
+                }
+                self.dot(p, 1.3, [0.22, 0.35, 0.9], alpha * 0.6);
+            }
+            Glyph::Agent(state) => {
+                let breathing = match state {
+                    AgentState::Working => 0.75 + 0.25 * (time * 2.8 + phase).sin(),
+                    AgentState::Blocked => 0.85 + 0.15 * (time * 0.9).sin(),
+                    AgentState::Completed => 0.6,
+                };
+                self.agent_dot(p, state.color(), alpha * breathing);
+            }
+        }
+    }
     fn dot(&mut self, pos: Vec3, size: f32, color: [f32; 3], alpha: f32) {
         self.dot_with_halo(pos, size, color, alpha, 3.4, 0.13);
     }
@@ -184,16 +257,7 @@ pub fn geometry(sim: &Simulation) -> Geometry {
         }
     }
     let root = coordinator(time);
-    g.dot(root, 7.0, [1.0, 0.62, 0.12], 1.0);
-    // Small crown around the coordinator makes its role distinct from workers.
-    for i in 0..32 {
-        g.dot(
-            circle(root, 0.085, i as f32 * TAU / 32.0 + time * 0.2),
-            1.15,
-            [1.0, 0.5, 0.08],
-            0.7,
-        );
-    }
+    g.glyph(Glyph::Coordinator, root, 1.0, time, 0.0);
     for (&id, life) in &sim.entities {
         let alpha = life.alpha(time);
         if alpha <= 0.001 {
@@ -202,11 +266,11 @@ pub fn geometry(sim: &Simulation) -> Geometry {
         let p = visible_position(sim, id);
         match id {
             Id::Node(_) => {
-                g.dot(p, 5.5, [0.25, 0.7, 1.0], alpha);
+                g.glyph(Glyph::Worker, p, alpha, time, 0.0);
                 g.curve(p, root, [0.3, 0.13, 0.7], alpha * 0.28, 0.5);
             }
             Id::Session(n, _) => {
-                g.dot(p, 4.4, [0.7, 0.32, 1.0], alpha);
+                g.glyph(Glyph::Session, p, alpha, time, 0.0);
                 g.curve(
                     p,
                     visible_position(sim, Id::Node(n)),
@@ -214,28 +278,9 @@ pub fn geometry(sim: &Simulation) -> Geometry {
                     alpha * 0.3,
                     0.18,
                 );
-                for i in 0..24 {
-                    g.dot(
-                        circle(p, 0.16, i as f32 * TAU / 24.0),
-                        0.9,
-                        [0.5, 0.15, 0.9],
-                        alpha * 0.6,
-                    );
-                }
             }
             Id::Workspace(n, s, _) => {
-                // Hollow diamond makes the workspace distinct from agent dots.
-                let diamond =
-                    std::array::from_fn::<_, 4, _>(|i| circle(p, 0.065, i as f32 * TAU / 4.0));
-                for i in 0..4 {
-                    g.line(
-                        diamond[i],
-                        diamond[(i + 1) % 4],
-                        [0.25, 0.5, 1.0],
-                        alpha * 0.8,
-                    );
-                }
-                g.dot(p, 1.3, [0.22, 0.35, 0.9], alpha * 0.6);
+                g.glyph(Glyph::Workspace, p, alpha, time, 0.0);
                 g.line(
                     p,
                     visible_position(sim, Id::Session(n, s)),
@@ -245,13 +290,6 @@ pub fn geometry(sim: &Simulation) -> Geometry {
             }
             Id::Agent(..) => {
                 let state = sim.state(id);
-                let breathing = match state {
-                    AgentState::Working => {
-                        0.75 + 0.25 * (time * 2.8 + noise(id.seed()) * TAU).sin()
-                    }
-                    AgentState::Blocked => 0.85 + 0.15 * (time * 0.9).sin(),
-                    AgentState::Completed => 0.6,
-                };
                 let (n, s, w, _) = id.indices();
                 g.line(
                     visible_position(sim, Id::Workspace(n, s, w)),
@@ -259,7 +297,7 @@ pub fn geometry(sim: &Simulation) -> Geometry {
                     [0.12, 0.3, 0.45],
                     alpha * 0.22,
                 );
-                g.agent_dot(p, state.color(), alpha * breathing);
+                g.glyph(Glyph::Agent(state), p, alpha, time, noise(id.seed()) * TAU);
             }
         }
     }
@@ -371,7 +409,7 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
     let cards_bottom = legend.bounds.top() - 20.0;
     let travel = cards_bottom - cards_top - 84.0;
     if !sim.callouts || rect.width() < 260.0 || travel < 18.0 {
-        crate::mesh_legend::draw(&painter, &legend);
+        crate::mesh_legend::draw(&painter, &legend, sim.time);
         return;
     }
     for (slot, event) in sim.events.iter().rev().enumerate() {
@@ -467,7 +505,7 @@ pub fn overlay(ui: &egui::Ui, sim: &Simulation, rect: egui::Rect) {
         );
     }
     // Paint last so moving leader lines cannot obscure the key.
-    crate::mesh_legend::draw(&painter, &legend);
+    crate::mesh_legend::draw(&painter, &legend, sim.time);
 }
 
 #[cfg(test)]
